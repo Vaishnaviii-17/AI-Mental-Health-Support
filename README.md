@@ -115,4 +115,4 @@ VITE_API_URL=http://localhost:5000
 
 ## Project
 
-MindEase – AI-Based Mental Health Support System
+AI-Based Mental Health Support System
