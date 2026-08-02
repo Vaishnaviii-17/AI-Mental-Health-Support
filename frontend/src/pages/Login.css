@@ -1,0 +1,28 @@
+.login-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+  font-size: var(--fs-xs);
+}
+
+.login-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.login-checkbox input {
+  accent-color: var(--forest-700);
+}
+
+.login-forgot {
+  color: var(--forest-700);
+  font-weight: 700;
+}
+
+.login-forgot:hover {
+  color: var(--gold-600);
+}

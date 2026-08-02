@@ -1,0 +1,108 @@
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-page);
+  padding: var(--space-lg);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 960px;
+  min-height: 600px;
+  display: grid;
+  grid-template-columns: 1fr;
+  background: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.auth-card--wide {
+  max-width: 1040px;
+}
+
+.auth-card__panel {
+  display: none;
+}
+
+.auth-card__content {
+  padding: var(--space-2xl) var(--space-xl);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+@media (min-width: 860px) {
+  .auth-card {
+    grid-template-columns: 0.9fr 1.1fr;
+  }
+
+  .auth-card__panel {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: radial-gradient(120% 140% at 0% 0%, var(--forest-600) 0%, var(--forest-900) 100%);
+    color: var(--cream-100);
+    padding: var(--space-xl);
+  }
+}
+
+.auth-card__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  color: var(--cream-100);
+  align-self: flex-start;
+}
+
+.auth-card__logo-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.12);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.auth-card__panel-title {
+  font-size: var(--fs-2xl);
+  margin-top: var(--space-2xl);
+  color: var(--cream-100);
+}
+
+.auth-card__panel-desc {
+  margin-top: var(--space-sm);
+  color: var(--text-on-dark-muted);
+  font-size: var(--fs-sm);
+  max-width: 320px;
+}
+
+.auth-card__quote {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-on-dark);
+}
+
+.auth-card__quote p {
+  font-style: italic;
+  font-size: var(--fs-sm);
+  color: var(--cream-100);
+}
+
+.auth-card__quote span {
+  display: block;
+  margin-top: var(--space-2xs);
+  font-size: var(--fs-2xs);
+  color: var(--text-on-dark-muted);
+}
+
+@media (max-width: 480px) {
+  .auth-card__content {
+    padding: var(--space-xl) var(--space-md);
+  }
+}
