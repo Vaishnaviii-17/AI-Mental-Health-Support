@@ -1,0 +1,104 @@
+.footer {
+  background: var(--forest-900);
+  color: var(--text-on-dark-muted);
+  padding-top: var(--space-2xl);
+}
+
+.footer__top {
+  display: grid;
+  grid-template-columns: 1.2fr 2fr;
+  gap: var(--space-2xl);
+  padding-bottom: var(--space-xl);
+  border-bottom: 1px solid var(--border-on-dark);
+}
+
+.footer__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--cream-100);
+}
+
+.footer__tagline {
+  margin-top: var(--space-sm);
+  font-size: var(--fs-sm);
+  max-width: 280px;
+}
+
+.footer__socials {
+  display: flex;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+
+.footer__social {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-on-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cream-100);
+  transition: background-color var(--dur-fast) var(--ease-organic);
+}
+
+.footer__social:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.footer__columns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+}
+
+.footer__column-title {
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--cream-100);
+  margin-bottom: var(--space-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.footer__column ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.footer__link {
+  font-size: var(--fs-sm);
+  transition: color var(--dur-fast) var(--ease-organic);
+}
+
+.footer__link:hover {
+  color: var(--gold-500);
+}
+
+.footer__bottom {
+  padding-block: var(--space-md);
+  text-align: center;
+  font-size: var(--fs-2xs);
+}
+
+@media (max-width: 900px) {
+  .footer__top {
+    grid-template-columns: 1fr;
+  }
+
+  .footer__columns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .footer__columns {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg) var(--space-md);
+  }
+}

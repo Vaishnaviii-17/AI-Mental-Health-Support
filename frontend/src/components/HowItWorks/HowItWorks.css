@@ -1,0 +1,122 @@
+.how {
+  background: var(--bg-surface-alt);
+}
+
+.how__inner {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: var(--space-2xl);
+  align-items: center;
+}
+
+.how__timeline {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.how__timeline::before {
+  content: "";
+  position: absolute;
+  left: 19px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--border-soft);
+}
+
+.how__step {
+  position: relative;
+  display: flex;
+  gap: var(--space-md);
+}
+
+.how__step-marker {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: var(--forest-700);
+  color: var(--cream-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.how__step-label {
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold-600);
+}
+
+.how__step-title {
+  font-size: var(--fs-lg);
+  margin-top: 2px;
+}
+
+.how__step-desc {
+  margin-top: var(--space-3xs);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.how__illustration {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.how__illustration-shape {
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 1;
+  border-radius: 50% 50% 45% 55% / 55% 45% 55% 45%;
+  background: linear-gradient(160deg, var(--sage-100), var(--white));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--forest-700);
+  box-shadow: var(--shadow-md);
+}
+
+.how__badge {
+  position: absolute;
+  bottom: 8%;
+  right: 4%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  background: var(--forest-700);
+  color: var(--cream-100);
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-full);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  box-shadow: var(--shadow-md);
+}
+
+.how__badge svg {
+  color: var(--gold-500);
+}
+
+@media (max-width: 900px) {
+  .how__inner {
+    grid-template-columns: 1fr;
+  }
+
+  .how__illustration {
+    order: -1;
+    margin-bottom: var(--space-md);
+  }
+
+  .how__illustration-shape {
+    max-width: 220px;
+  }
+}
