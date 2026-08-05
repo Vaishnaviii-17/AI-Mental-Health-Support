@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 import AuthChoice from "./pages/AuthChoice";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Dashboard from "./pages/Dashboard";
 import "./styles/global.css";
 
 function App() {
@@ -12,6 +13,7 @@ function App() {
       <Route path="/auth" element={<AuthChoice />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      <Route path="/dashboard" element={<Dashboard />} />
     </Routes>
   );
 }

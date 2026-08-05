@@ -268,9 +268,10 @@ Create a Pull Request and request a review before merging into the `main` branch
 
 # 👥 Contributors
 
+- Aarti Sakpal
+- Esha Pawar
+- Khushboo Yadav
 - Vaishnavi Sawant
-- Team Members
-
 ---
 
 # 📄 License
