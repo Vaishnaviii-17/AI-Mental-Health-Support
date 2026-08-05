@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Leaf, Menu, X } from "lucide-react";
+import { Bell, Leaf, Menu, UserRound, X } from "lucide-react";
 import "./Navbar.css";
 
 const NAV_LINKS = [
@@ -12,9 +12,22 @@ const NAV_LINKS = [
   { label: "Privacy", href: "#privacy" },
 ];
 
-function Navbar() {
+const DASHBOARD_LINKS = [
+  { label: "Dashboard", href: "#dashboard" },
+  { label: "Mood", href: "#today-mood" },
+  { label: "Journal", href: "#recent-journals" },
+  { label: "Activities", href: "#recommendation" },
+  { label: "AI Chat", href: "#quick-actions" },
+  { label: "Profile", href: "#profile" },
+];
+
+function Navbar({ profile }) {
+  const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const isDashboard = location.pathname === "/dashboard";
+  const links = isDashboard ? DASHBOARD_LINKS : NAV_LINKS;
+  const avatarInitial = profile?.username?.charAt(0)?.toUpperCase() || "M";
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 12);
@@ -43,21 +56,37 @@ function Navbar() {
         </Link>
 
         <nav className="navbar__links" aria-label="Primary navigation">
-          {NAV_LINKS.map((link) => (
+          {links.map((link) => (
             <a key={link.href} href={link.href} className="navbar__link">
               {link.label}
             </a>
           ))}
         </nav>
 
-        <div className="navbar__actions">
-          <NavLink to="/login" className="navbar__login">
-            Login
-          </NavLink>
-          <NavLink to="/auth" className="btn btn-primary navbar__cta">
-            Get Started
-          </NavLink>
-        </div>
+        {isDashboard ? (
+          <div className="navbar__actions navbar__actions--dashboard">
+            <button
+              type="button"
+              className="navbar__notification"
+              aria-label="View notifications"
+            >
+              <Bell size={19} aria-hidden="true" />
+              <span className="navbar__notification-dot" aria-hidden="true" />
+            </button>
+            <a href="#profile" className="navbar__avatar" aria-label="View profile">
+              {profile?.username ? avatarInitial : <UserRound size={18} aria-hidden="true" />}
+            </a>
+          </div>
+        ) : (
+          <div className="navbar__actions">
+            <NavLink to="/login" className="navbar__login">
+              Login
+            </NavLink>
+            <NavLink to="/auth" className="btn btn-primary navbar__cta">
+              Get Started
+            </NavLink>
+          </div>
+        )}
 
         <button
           type="button"
@@ -85,7 +114,7 @@ function Navbar() {
               className="navbar__mobile-links"
               aria-label="Mobile navigation"
             >
-              {NAV_LINKS.map((link) => (
+              {links.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
@@ -95,22 +124,29 @@ function Navbar() {
                   {link.label}
                 </a>
               ))}
-              <div className="navbar__mobile-actions">
-                <NavLink
-                  to="/login"
-                  className="btn btn-ghost"
-                  onClick={closeMenu}
-                >
-                  Login
-                </NavLink>
-                <NavLink
-                  to="/auth"
-                  className="btn btn-primary"
-                  onClick={closeMenu}
-                >
-                  Get Started
-                </NavLink>
-              </div>
+              {isDashboard ? (
+                <div className="navbar__mobile-profile">
+                  <span className="navbar__avatar" aria-hidden="true">{avatarInitial}</span>
+                  <span>{profile?.username || "MindEase member"}</span>
+                </div>
+              ) : (
+                <div className="navbar__mobile-actions">
+                  <NavLink
+                    to="/login"
+                    className="btn btn-ghost"
+                    onClick={closeMenu}
+                  >
+                    Login
+                  </NavLink>
+                  <NavLink
+                    to="/auth"
+                    className="btn btn-primary"
+                    onClick={closeMenu}
+                  >
+                    Get Started
+                  </NavLink>
+                </div>
+              )}
             </nav>
           </motion.div>
         )}
