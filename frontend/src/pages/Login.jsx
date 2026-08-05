@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import AuthCard from "../components/AuthCard/AuthCard";
+import { login } from "../services/authService";
 import "../styles/forms.css";
 import "./Login.css";
 
@@ -14,9 +15,26 @@ function Login() {
     setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
 
-  const handleSubmit = (e) => {
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Frontend-only for now — wire this up to authService once the backend route is ready.
+
+    try {
+      const response = await login({
+        username: form.username,
+        password: form.password,
+      });
+
+      localStorage.setItem("token", response.data.token);
+
+      //alert("Login successful!");
+
+      navigate("/dashboard");
+    } catch (error) {
+      console.error(error);
+      alert(error.response?.data?.message || "Login failed.");
+    }
   };
 
   return (
