@@ -2,6 +2,10 @@ const express = require("express");
 const cors = require("cors");
 
 const authRoutes = require("./routes/authRoutes");
+const chatRoutes = require("./routes/chatRoutes");
+const journalRoutes = require("./routes/journalRoutes");
+const moodRoutes = require("./routes/moodRoutes");
+const userRoutes = require("./routes/userRoutes");
 const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
@@ -19,6 +23,12 @@ app.get("/", (req, res) => {
 
 // Authentication Routes
 app.use("/api/auth", authRoutes);
+
+// Application Feature Routes
+app.use("/api/chat", chatRoutes);
+app.use("/api/journal", journalRoutes);
+app.use("/api/mood", moodRoutes);
+app.use("/api/user", userRoutes);
 
 // 404 Handler
 app.use(errorHandler);
