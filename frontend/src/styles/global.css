@@ -256,6 +256,50 @@ input:focus-visible,
   color: var(--text-on-dark-muted);
 }
 
+/* Shared form field utility -----------------------------------------------*/
+/* Reused by Journal, Profile, Chat pages */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-sm);
+}
+
+.field label {
+  font-family: var(--font-body);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-soft);
+  font-size: var(--fs-sm);
+  font-family: inherit;
+  background: var(--white);
+  color: var(--text-primary);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  border-color: var(--forest-700);
+  box-shadow: 0 0 0 3px rgba(27, 67, 50, 0.1);
+  outline: none;
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--text-faint);
+}
+
 /* Skip link ---------------------------------------------------------------*/
 .skip-link {
   position: absolute;

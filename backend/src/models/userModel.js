@@ -37,7 +37,7 @@ async function findByUsername(username) {
  */
 async function findById(id) {
   const query = `
-    SELECT id, username, created_at, updated_at
+    SELECT id, username, email, full_name, created_at, updated_at
     FROM users
     WHERE id = $1;
   `;
@@ -65,6 +65,25 @@ async function updatePassword(id, hashedPassword) {
 }
 
 /**
+ * Update user profile details
+ */
+async function updateProfile(id, { username, email, full_name }) {
+  const query = `
+    UPDATE users
+    SET username = $1,
+        email = $2,
+        full_name = $3,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $4
+    RETURNING id, username, email, full_name, created_at, updated_at;
+  `;
+
+  const { rows } = await pool.query(query, [username, email, full_name, id]);
+
+  return rows[0] || null;
+}
+
+/**
  * Delete user
  */
 async function deleteUser(id) {
@@ -81,5 +100,6 @@ module.exports = {
   findByUsername,
   findById,
   updatePassword,
+  updateProfile,
   deleteUser,
 };
