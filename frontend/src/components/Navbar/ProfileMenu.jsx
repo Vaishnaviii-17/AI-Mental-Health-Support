@@ -99,7 +99,7 @@ function ProfileMenu({ profile }) {
 
             <div className="profile-menu__divider" />
 
-            <button className="profile-menu__item">
+            <button className="profile-menu__item" onClick={() => { setOpen(false); navigate("/profile"); }}>
               <User size={18} />
               <span>Profile</span>
             </button>

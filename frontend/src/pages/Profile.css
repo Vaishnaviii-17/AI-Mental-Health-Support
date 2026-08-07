@@ -1,0 +1,460 @@
+@import "../styles/variables.css";
+
+.profile-page {
+  padding: var(--space-md) 0 var(--space-3xl);
+  background-color: var(--bg-page);
+  min-height: calc(100vh - var(--nav-height));
+}
+
+.profile-header {
+  margin-bottom: var(--space-lg);
+}
+
+.profile-header h1 {
+  font-size: var(--fs-3xl);
+  margin-top: var(--space-3xs);
+}
+
+.profile-subtitle {
+  color: var(--text-muted);
+  font-size: var(--fs-md);
+  margin-top: var(--space-3xs);
+}
+
+/* ==========================================
+   Alert styles — global + section-level
+   ========================================== */
+.profile-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-md);
+  font-size: var(--fs-sm);
+  animation: profileFadeIn 0.3s ease;
+}
+
+.profile-section-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  margin-top: var(--space-sm);
+  font-size: var(--fs-xs);
+  animation: profileFadeIn 0.3s ease;
+}
+
+.profile-alert--error {
+  background-color: #fdf2f2;
+  color: #c53030;
+  border: 1px solid #fbd5d5;
+}
+
+.profile-alert--success {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+/* ==========================================
+   Profile Grid Layout
+   ========================================== */
+.profile-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: var(--space-lg);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================
+   Avatar Card (Sidebar)
+   ========================================== */
+.profile-avatar-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+  position: sticky;
+  top: calc(var(--nav-height) + 1.5rem);
+}
+
+@media (max-width: 900px) {
+  .profile-avatar-card {
+    position: static;
+  }
+}
+
+.profile-big-avatar {
+  display: grid;
+  place-items: center;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--forest-700), var(--forest-500));
+  color: var(--cream-100);
+  font-family: var(--font-display);
+  font-size: var(--fs-3xl);
+  box-shadow: var(--shadow-md);
+  margin-bottom: var(--space-md);
+}
+
+.profile-avatar-card h2 {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: var(--fs-lg);
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.profile-email-display {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--space-3xs);
+}
+
+.profile-member-date {
+  font-size: var(--fs-2xs);
+  color: var(--text-faint);
+  margin-bottom: var(--space-lg);
+}
+
+.profile-logout-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0.8rem;
+}
+
+/* ==========================================
+   Form Column
+   ========================================== */
+.profile-content-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.profile-card-icon {
+  color: var(--gold-500);
+}
+
+.profile-form {
+  margin-top: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* Field with error state */
+.field--error input {
+  border-color: #e53e3e !important;
+  background-color: #fdf2f2;
+}
+
+.field-error-msg {
+  font-size: var(--fs-2xs);
+  color: #c53030;
+  margin-top: 4px;
+}
+
+/* Generic input styling inside profile forms */
+.profile-form input[type="text"],
+.profile-form input[type="email"],
+.profile-form input[type="password"] {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border-soft);
+  font-size: var(--fs-sm);
+  background: var(--white);
+  color: var(--text-primary);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.profile-form input:focus {
+  border-color: var(--forest-700);
+  box-shadow: 0 0 0 3px rgba(27, 67, 50, 0.1);
+  outline: none;
+}
+
+/* Password field with show/hide toggle */
+.input-with-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-toggle input {
+  padding-right: 3rem !important;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.75rem;
+  color: var(--text-faint);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-fast);
+}
+
+.password-toggle-btn:hover {
+  color: var(--text-primary);
+}
+
+/* Password Strength Indicator */
+.password-strength-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: 6px;
+}
+
+.strength-segments {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.strength-segments span {
+  flex: 1;
+  height: 4px;
+  border-radius: 999px;
+  background-color: var(--border-soft);
+  transition: background-color 0.3s ease;
+}
+
+/* Level 1: Weak — 1 red bar */
+.strength-level-1 span:nth-child(1) { background-color: #e53e3e; }
+/* Level 2: Fair — 2 orange bars */
+.strength-level-2 span:nth-child(1),
+.strength-level-2 span:nth-child(2) { background-color: #dd6b20; }
+/* Level 3: Good — 3 yellow-green bars */
+.strength-level-3 span:nth-child(1),
+.strength-level-3 span:nth-child(2),
+.strength-level-3 span:nth-child(3) { background-color: #d69e2e; }
+/* Level 4: Strong — all 4 green bars */
+.strength-level-4 span { background-color: #276749; }
+
+.strength-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.strength-label-1 { color: #e53e3e; }
+.strength-label-2 { color: #dd6b20; }
+.strength-label-3 { color: #d69e2e; }
+.strength-label-4 { color: #276749; }
+
+.profile-submit-btn {
+  margin-top: var(--space-xs);
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.8rem 1.6rem;
+}
+
+.btn-spinner {
+  animation: profileSpin 1s linear infinite;
+}
+
+/* ==========================================
+   Danger Zone
+   ========================================== */
+.profile-danger-card {
+  border: 1.5px solid rgba(197, 48, 48, 0.25);
+  background-color: rgba(253, 242, 242, 0.35);
+}
+
+.eyebrow-danger {
+  color: #c53030;
+}
+
+.eyebrow-danger::before {
+  background: #c53030;
+}
+
+.profile-card-icon-danger {
+  color: #c53030;
+}
+
+.danger-explanation {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.profile-delete-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #c53030;
+  color: var(--white);
+  box-shadow: var(--shadow-sm);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.8rem 1.6rem;
+  font-weight: 700;
+  font-size: var(--fs-xs);
+  transition: background-color var(--dur-fast), transform var(--dur-fast), box-shadow var(--dur-fast);
+}
+
+.profile-delete-trigger-btn:hover {
+  background-color: #9b2c2c;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* ==========================================
+   Loading State
+   ========================================== */
+.profile-loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3xl) var(--space-md);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.spinner-icon {
+  width: 36px;
+  height: 36px;
+  color: var(--forest-700);
+  animation: profileSpin 1s linear infinite;
+  margin-bottom: var(--space-sm);
+}
+
+/* ==========================================
+   Delete Confirmation Modal
+   ========================================== */
+.profile-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: rgba(15, 43, 33, 0.45);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: var(--space-md);
+  animation: profileFadeIn 0.2s ease;
+}
+
+.profile-modal-card {
+  background-color: var(--white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: 480px;
+  width: 100%;
+  padding: var(--space-xl);
+  position: relative;
+  border: 1px solid var(--border-soft);
+}
+
+.profile-modal-close {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  color: var(--text-faint);
+  padding: var(--space-3xs);
+  border-radius: var(--radius-sm);
+  transition: color 0.2s, background-color 0.2s;
+}
+
+.profile-modal-close:hover {
+  color: var(--text-primary);
+  background-color: var(--sage-50);
+}
+
+.delete-modal-content {
+  text-align: center;
+}
+
+.danger-icon-large {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background-color: #fed7d7;
+  color: #c53030;
+  margin: 0 auto var(--space-md);
+}
+
+.delete-modal-content h2 {
+  font-size: var(--fs-xl);
+  color: var(--text-primary);
+  margin-bottom: var(--space-3xs);
+}
+
+.delete-modal-content p {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.danger-warning-subtitle {
+  color: #c53030 !important;
+  font-weight: 700;
+  margin-top: var(--space-3xs);
+}
+
+.delete-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.delete-modal-actions .btn {
+  padding: 0.8rem 1.4rem;
+}
+
+.delete-confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #c53030;
+  color: var(--white);
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  padding: 0.8rem 1.4rem;
+  border: none;
+  transition: background-color var(--dur-fast);
+}
+
+.delete-confirm-btn:hover:not(:disabled) {
+  background-color: #9b2c2c;
+}
+
+.delete-confirm-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+@keyframes profileSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes profileFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
