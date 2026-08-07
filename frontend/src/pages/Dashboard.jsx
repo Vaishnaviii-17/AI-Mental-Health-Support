@@ -79,6 +79,7 @@ function Dashboard() {
               <WelcomeCard username={profile.username} />
             </motion.div>
             <section
+              id="today-mood"
               className="dashboard-overview"
               aria-label="Today at a glance"
             >

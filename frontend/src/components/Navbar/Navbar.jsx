@@ -6,28 +6,29 @@ import ProfileMenu from "./ProfileMenu";
 import "./Navbar.css";
 
 const NAV_LINKS = [
-  { label: "Home", href: "#home" },
-  { label: "Features", href: "#features" },
-  { label: "How It Works", href: "#how-it-works" },
-  { label: "Testimonials", href: "#testimonials" },
-  { label: "Privacy", href: "#privacy" },
+  { label: "Home", href: "/#home" },
+  { label: "Features", href: "/#features" },
+  { label: "How It Works", href: "/#how-it-works" },
+  { label: "Testimonials", href: "/#testimonials" },
+  { label: "Privacy", href: "/#privacy" },
 ];
 
 const DASHBOARD_LINKS = [
-  { label: "Dashboard", href: "#dashboard" },
-  { label: "Mood", href: "#today-mood" },
-  { label: "Journal", href: "#recent-journals" },
-  { label: "Activities", href: "#recommendation" },
-  { label: "AI Chat", href: "#quick-actions" },
-  { label: "Profile", href: "#profile" },
+  { label: "Dashboard", href: "/dashboard" },
+  { label: "Mood", href: "/dashboard#today-mood" },
+  { label: "Journal", href: "/journal" },
+  { label: "Activities", href: "/dashboard#recommendation" },
+  { label: "AI Chat", href: "/chat" },
+  { label: "Analytics", href: "/analytics" },
+  { label: "Profile", href: "/profile" },
 ];
 
 function Navbar({ profile }) {
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const isDashboard = location.pathname === "/dashboard";
-  const links = isDashboard ? DASHBOARD_LINKS : NAV_LINKS;
+  const isAppPage = ["/dashboard", "/chat", "/journal", "/analytics", "/profile"].includes(location.pathname);
+  const links = isAppPage ? DASHBOARD_LINKS : NAV_LINKS;
   const avatarInitial = profile?.username?.charAt(0)?.toUpperCase() || "M";
 
   useEffect(() => {
@@ -46,10 +47,12 @@ function Navbar({ profile }) {
 
   const closeMenu = useCallback(() => setMenuOpen(false), []);
 
+  const isRouterLink = (href) => href.startsWith("/") && !href.includes("#");
+
   return (
     <header className={`navbar ${scrolled ? "navbar--scrolled" : ""}`}>
       <div className="container navbar__inner">
-        <Link to="/" className="navbar__logo" aria-label="MindEase — Home">
+        <Link to={isAppPage ? "/dashboard" : "/"} className="navbar__logo" aria-label="MindEase — Home">
           <span className="navbar__logo-icon">
             <Leaf size={20} strokeWidth={2} aria-hidden="true" />
           </span>
@@ -57,14 +60,20 @@ function Navbar({ profile }) {
         </Link>
 
         <nav className="navbar__links" aria-label="Primary navigation">
-          {links.map((link) => (
-            <a key={link.href} href={link.href} className="navbar__link">
-              {link.label}
-            </a>
-          ))}
+          {links.map((link) => 
+            isRouterLink(link.href) ? (
+              <Link key={link.href} to={link.href} className="navbar__link">
+                {link.label}
+              </Link>
+            ) : (
+              <a key={link.href} href={link.href} className="navbar__link">
+                {link.label}
+              </a>
+            )
+          )}
         </nav>
 
-        {isDashboard ? (
+        {isAppPage ? (
           <div className="navbar__actions navbar__actions--dashboard">
             <button
               type="button"
@@ -113,18 +122,29 @@ function Navbar({ profile }) {
               className="navbar__mobile-links"
               aria-label="Mobile navigation"
             >
-              {links.map((link) => (
-                <a
-                  key={link.href}
-                  href={link.href}
-                  className="navbar__mobile-link"
-                  onClick={closeMenu}
-                >
-                  {link.label}
-                </a>
-              ))}
-              {isDashboard ? (
-                <div className="navbar__mobile-profile">
+              {links.map((link) => 
+                isRouterLink(link.href) ? (
+                  <Link
+                    key={link.href}
+                    to={link.href}
+                    className="navbar__mobile-link"
+                    onClick={closeMenu}
+                  >
+                    {link.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="navbar__mobile-link"
+                    onClick={closeMenu}
+                  >
+                    {link.label}
+                  </a>
+                )
+              )}
+              {isAppPage ? (
+                <div className="navbar__mobile-profile" onClick={() => { closeMenu(); window.location.href = "/profile"; }}>
                   <span className="navbar__avatar" aria-hidden="true">{avatarInitial}</span>
                   <span>{profile?.username || "MindEase member"}</span>
                 </div>
