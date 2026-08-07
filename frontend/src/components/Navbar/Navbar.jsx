@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Leaf, Menu, UserRound, X } from "lucide-react";
+import ProfileMenu from "./ProfileMenu";
 import "./Navbar.css";
 
 const NAV_LINKS = [
@@ -73,9 +74,7 @@ function Navbar({ profile }) {
               <Bell size={19} aria-hidden="true" />
               <span className="navbar__notification-dot" aria-hidden="true" />
             </button>
-            <a href="#profile" className="navbar__avatar" aria-label="View profile">
-              {profile?.username ? avatarInitial : <UserRound size={18} aria-hidden="true" />}
-            </a>
+            <ProfileMenu profile={profile} />
           </div>
         ) : (
           <div className="navbar__actions">
