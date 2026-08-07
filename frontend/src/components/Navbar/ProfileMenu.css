@@ -1,0 +1,165 @@
+.profile-menu {
+  position: relative;
+}
+
+.profile-menu__trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+
+  border: none;
+  background: transparent;
+
+  cursor: pointer;
+}
+
+.profile-menu__avatar {
+  width: 42px;
+  height: 42px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 50%;
+
+  background: var(--forest-700);
+
+  color: var(--cream-100);
+
+  font-weight: 700;
+  font-size: 0.95rem;
+
+  box-shadow: var(--shadow-sm);
+
+  transition: 0.25s;
+}
+
+.profile-menu__trigger:hover .profile-menu__avatar {
+  background: var(--forest-600);
+}
+
+.profile-menu__arrow {
+  color: var(--forest-700);
+
+  transition: 0.25s;
+}
+
+.profile-menu__arrow--open {
+  transform: rotate(180deg);
+}
+
+.profile-menu__dropdown {
+  position: absolute;
+
+  top: calc(100% + 12px);
+
+  right: 0;
+
+  width: 260px;
+
+  background: var(--white);
+
+  border-radius: 22px;
+
+  border: 1px solid var(--border-soft);
+
+  box-shadow: var(--shadow-lg);
+
+  overflow: hidden;
+
+  z-index: 300;
+}
+
+.profile-menu__header {
+  display: flex;
+
+  align-items: center;
+
+  gap: 1rem;
+
+  padding: 1.2rem;
+}
+
+.profile-menu__avatar--large {
+  width: 54px;
+  height: 54px;
+
+  font-size: 1.2rem;
+}
+
+.profile-menu__header h4 {
+  margin: 0;
+
+  color: var(--forest-700);
+
+  font-size: 1rem;
+
+  font-weight: 700;
+}
+
+.profile-menu__header p {
+  margin-top: 0.3rem;
+
+  color: var(--text-muted);
+
+  font-size: 0.85rem;
+}
+
+.profile-menu__divider {
+  height: 1px;
+
+  background: var(--border-soft);
+
+  margin: 0 1rem;
+}
+
+.profile-menu__item {
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 0.9rem;
+
+  padding: 0.95rem 1.2rem;
+
+  border: none;
+
+  background: transparent;
+
+  cursor: pointer;
+
+  color: var(--text-primary);
+
+  font-size: 0.95rem;
+
+  transition: background 0.2s ease;
+}
+
+.profile-menu__item:hover {
+  background: var(--sage-50);
+}
+
+.profile-menu__item svg {
+  color: var(--forest-700);
+}
+
+.profile-menu__logout {
+  color: #b84a3a;
+}
+
+.profile-menu__logout svg {
+  color: #b84a3a;
+}
+
+.profile-menu__logout:hover {
+  background: #fff4f3;
+}
+
+@media (max-width: 768px) {
+  .profile-menu__dropdown {
+    width: 230px;
+  }
+}
