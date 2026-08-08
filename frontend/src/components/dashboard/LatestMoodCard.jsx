@@ -37,7 +37,7 @@ const MOOD_COLORS = {
   },
 };
 
-function LatestMoodCard({ mood }) {
+function LatestMoodCard({ mood, onUpdate }) {
   if (!mood) {
     return (
       <article className="dashboard-card dashboard-mood-card">
@@ -113,40 +113,53 @@ function LatestMoodCard({ mood }) {
         </h3>
 
         <p className="dashboard-mood-card__time">
-          Detected {mood.detectedAt}
+          Detected{" "}
+          {mood.detectedAt ||
+            (mood.updated_at
+              ? new Date(mood.updated_at).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                }): mood.created_at
+              ? new Date(mood.created_at).toLocaleTimeString([], {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })
+              : "Today")}
         </p>
 
-        <div className="dashboard-confidence">
+        {mood.note && (
+          <div className="dashboard-mood-note">
+            <span className="dashboard-mood-note__label">
+              Your note
+            </span>
 
-          <span>Confidence</span>
+            <p>{mood.note}</p>
+          </div>
+        )}
 
-          <strong>{mood.confidence}%</strong>
+        {mood.insight && (
+          <div className="dashboard-mood-insight">
+            <Sparkles
+              size={18}
+              strokeWidth={2}
+            />
 
-        </div>
-
-        <div className="dashboard-mood-insight">
-
-          <Sparkles
-            size={18}
-            strokeWidth={2}
-          />
-
-          <p>{mood.insight}</p>
-
-        </div>
+            <p>{mood.insight}</p>
+          </div>
+        )}
 
       </div>
 
       <div className="dashboard-mood-actions">
 
-        <Link
-          to="/mood"
+        <button
+          type="button"
           className="dashboard-text-link"
+          onClick={() => onUpdate?.(mood)}
         >
           <Pencil size={15} />
-
           Update Mood
-        </Link>
+        </button>
 
         <Link
           to="/mood/history"

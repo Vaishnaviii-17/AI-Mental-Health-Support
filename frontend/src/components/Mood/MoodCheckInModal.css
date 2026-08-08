@@ -1,0 +1,294 @@
+/* ===========================================
+   Mood Check-In Modal
+=========================================== */
+
+.mood-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 1.5rem;
+
+  background: rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(6px);
+
+  animation: moodFadeIn 0.25s ease;
+}
+
+.mood-modal {
+  position: relative;
+
+  width: 100%;
+  max-width: 540px;
+
+  padding: 2rem;
+
+  background: #ffffff;
+  border-radius: 24px;
+
+  box-shadow:
+    0 15px 40px rgba(0, 0, 0, 0.15);
+
+  animation: moodSlideUp 0.3s ease;
+}
+
+/* ===========================================
+   Close Button
+=========================================== */
+
+.mood-modal__close {
+  position: absolute;
+
+  top: 18px;
+  right: 18px;
+
+  width: 38px;
+  height: 38px;
+
+  border: none;
+  border-radius: 50%;
+
+  cursor: pointer;
+
+  background: #f6f7f8;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: 0.2s ease;
+}
+
+.mood-modal__close:hover {
+  background: #ececec;
+}
+
+/* ===========================================
+   Header
+=========================================== */
+
+.mood-modal__header {
+  text-align: center;
+}
+
+.mood-modal__icon {
+  font-size: 2.4rem;
+  margin-bottom: 0.8rem;
+}
+
+.mood-modal__header h2 {
+  margin: 0;
+  color: var(--forest-800);
+
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.mood-modal__header p {
+  margin-top: 0.75rem;
+
+  color: var(--text-muted);
+
+  line-height: 1.6;
+}
+
+/* ===========================================
+   Emoji Selector
+=========================================== */
+
+.mood-selector {
+  display: flex;
+  justify-content: space-between;
+
+  gap: 0.9rem;
+
+  margin-top: 2rem;
+}
+
+.mood-selector__item {
+  width: 72px;
+  height: 72px;
+
+  border-radius: 18px;
+
+  border: 2px solid transparent;
+
+  background: #f8faf8;
+
+  cursor: pointer;
+
+  transition: all 0.25s ease;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mood-selector__item:hover {
+  transform: translateY(-3px);
+
+  border-color: var(--forest-500);
+
+  background: #f3faf5;
+}
+
+.mood-selector__item.active {
+  transform: scale(1.08);
+
+  border-color: var(--forest-700);
+
+  background: #eef7f0;
+
+  box-shadow: 0 8px 20px rgba(47, 133, 90, 0.18);
+}
+
+.mood-selector__emoji {
+  font-size: 2rem;
+}
+
+/* ===========================================
+   Selected Label
+=========================================== */
+
+.mood-selected-label {
+  margin-top: 1.2rem;
+
+  text-align: center;
+
+  font-size: 1rem;
+  font-weight: 600;
+
+  color: var(--forest-700);
+
+  min-height: 24px;
+}
+
+/* ===========================================
+   Note
+=========================================== */
+
+.mood-note {
+  margin-top: 2rem;
+}
+
+.mood-note label {
+  display: block;
+
+  margin-bottom: 0.65rem;
+
+  font-weight: 600;
+
+  color: var(--text-primary);
+}
+
+.mood-note textarea {
+  width: 100%;
+  min-height: 120px;
+
+  resize: none;
+
+  padding: 1rem;
+
+  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+
+  outline: none;
+
+  font-size: 0.95rem;
+  font-family: inherit;
+
+  transition: border-color 0.2s ease;
+}
+
+.mood-note textarea:focus {
+  border-color: var(--forest-700);
+}
+
+.mood-note__count {
+  display: block;
+
+  margin-top: 0.45rem;
+
+  text-align: right;
+
+  font-size: 0.82rem;
+
+  color: var(--text-muted);
+}
+
+/* ===========================================
+   Save Button
+=========================================== */
+
+.mood-save-btn {
+  width: 100%;
+
+  margin-top: 2rem;
+}
+
+.mood-save-btn:disabled {
+  cursor: not-allowed;
+
+  opacity: 0.55;
+}
+
+/* ===========================================
+   Animations
+=========================================== */
+
+@keyframes moodFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes moodSlideUp {
+  from {
+    opacity: 0;
+
+    transform: translateY(20px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ===========================================
+   Responsive
+=========================================== */
+
+@media (max-width: 600px) {
+
+  .mood-modal {
+    padding: 1.5rem;
+  }
+
+  .mood-selector {
+    gap: 0.5rem;
+  }
+
+  .mood-selector__item {
+    width: 58px;
+    height: 58px;
+  }
+
+  .mood-selector__emoji {
+    font-size: 1.65rem;
+  }
+
+  .mood-modal__header h2 {
+    font-size: 1.5rem;
+  }
+
+}
