@@ -1,6 +1,33 @@
 const pool = require("../config/db");
 
 /**
+ * NOTE ON SCHEMA: this table has (or requires) two JSONB columns
+ * beyond the original text/emoji/score fields:
+ *
+ *   secondary_emotions JSONB  -- array of { label, probability }
+ *                                objects from the GoEmotions-only
+ *                                emotion resolution in predictor.py.
+ *
+ *   risk_analysis JSONB       -- the complete risk screening object
+ *                                from calculate_risk_assessment() in
+ *                                predictor.py (risk_score, risk_level,
+ *                                detected_risk_categories, etc). This
+ *                                is a heuristic screening indicator,
+ *                                not a clinical assessment.
+ *
+ * If the `journals` table does not yet have these columns, run:
+ *
+ *   ALTER TABLE journals
+ *     ADD COLUMN IF NOT EXISTS secondary_emotions JSONB DEFAULT '[]'::jsonb;
+ *
+ *   ALTER TABLE journals
+ *     ADD COLUMN IF NOT EXISTS risk_analysis JSONB;
+ *
+ * (see migrations/xxxx_add_risk_analysis_to_journals.sql for the
+ * risk_analysis migration if this project has a migration runner.)
+ */
+
+/**
  * Create a new journal entry
  */
 async function createJournal(
@@ -10,23 +37,16 @@ async function createJournal(
     content,
     mood,
     emotion,
+    secondaryEmotions,
     sentimentScore,
+    riskAnalysis,
     insight,
-    riskLevel,
-    riskScore,
   }
 ) {
   const query = `
     INSERT INTO journals (
-      user_id,
-      title,
-      content,
-      mood,
-      emotion,
-      sentiment_score,
-      insight,
-      risk_level,
-      risk_score
+      user_id, title, content, mood, emotion,
+      secondary_emotions, sentiment_score, risk_analysis, insight
     )
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     RETURNING *;
@@ -38,12 +58,11 @@ async function createJournal(
     content,
     mood,
     emotion,
+    JSON.stringify(secondaryEmotions || []),
     sentimentScore,
+    JSON.stringify(riskAnalysis || {}),
     insight,
-    riskLevel,
-    riskScore,
   ];
-
   const { rows } = await pool.query(query, values);
   return rows[0];
 }

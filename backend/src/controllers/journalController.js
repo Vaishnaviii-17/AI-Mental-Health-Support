@@ -1,6 +1,12 @@
 const journalModel = require("../models/journalModel");
 const inferenceService = require("../services/inferenceService");
-const { emotionToEmoji, sentimentToScore, buildJournalSummary, resolveEmotion } = require("../utils/mlMapping");
+const {
+  emotionToEmoji,
+  sentimentToScore,
+  buildJournalSummary,
+  resolveEmotion,
+  resolveRisk,
+} = require("../utils/mlMapping");
 const response = require("../utils/response");
 const asyncHandler = require("../utils/asyncHandler");
 
@@ -26,9 +32,13 @@ const getJournalById = asyncHandler(async (req, res) => {
 /**
  * Create a new journal entry.
  *
- * Journal analysis now comes from the trained ML models (via the Python
- * inference server) instead of Gemini. Gemini is left untouched for any
- * other feature that may still use it (see geminiService.js).
+ * Journal analysis comes from the trained GoEmotions model (via the
+ * Python inference server) -- the sole emotion-analysis model.
+ * Python is also the sole authority for risk screening
+ * (calculate_risk_assessment() in predictor.py); this controller
+ * only reads analysis.risk and persists it, it never recalculates
+ * risk in Node. Risk screening is a heuristic indicator, not a
+ * clinical assessment.
  */
 const createJournal = asyncHandler(async (req, res) => {
   const { title, content } = req.body;
@@ -42,9 +52,9 @@ const createJournal = asyncHandler(async (req, res) => {
 
   const trimmedContent = content.trim();
 
-  // 1. Run the trained ML models (6-class emotion + GoEmotions
-  //    sentiment/risk) via the Python inference server. This replaces
-  //    the previous geminiService.analyzeJournal(content) call.
+  // 1. Run the trained GoEmotions model (emotion + sentiment + risk)
+  //    via the Python inference server. A single call -- Python
+  //    already returns emotion, sentiment, AND risk together.
   let analysis;
   try {
     analysis = await inferenceService.analyzeText(trimmedContent);
@@ -58,48 +68,48 @@ const createJournal = asyncHandler(async (req, res) => {
   }
 
   // 2. Map the ML analysis onto the EXISTING journal schema
-  //    (title, content, mood, emotion, sentiment_score, insight).
-  //    Python (predictor.py) already made the final primary-vs-fallback
-  //    decision; resolveEmotion() just reads that decision -- it does
-  //    NOT re-evaluate ambiguity. See utils/mlMapping.js for details.
+  //    (title, content, mood, emotion, secondary_emotions,
+  //    sentiment_score, risk_analysis, insight). Python already
+  //    resolved emotion + risk; resolveEmotion()/resolveRisk() just
+  //    read those decisions -- they do NOT re-evaluate them.
   const resolvedEmotion = resolveEmotion(analysis);
+  const resolvedRisk = resolveRisk(analysis);
 
   const finalEmotion = resolvedEmotion.emotion || null;
 
+  // Full risk object as returned by Python, persisted as-is into
+  // the risk_analysis JSONB column. Node does not add to, remove
+  // from, or recompute any part of it.
+  const riskAnalysis = analysis?.risk || null;
+
   console.log("🧠 Emotion resolution:", {
-    primaryEmotion: resolvedEmotion.primaryEmotion,
-    primaryConfidence: resolvedEmotion.primaryConfidence,
-    finalEmotion,
+    emotion: finalEmotion,
+    probability: resolvedEmotion.probability,
     source: resolvedEmotion.source,
-    fallbackReason: resolvedEmotion.fallbackReason,
-    fallbackWasAmbiguous: resolvedEmotion.fallbackWasAmbiguous,
+    secondaryEmotions: resolvedEmotion.secondaryEmotions,
+  });
+
+  console.log("🛟 Risk screening resolution:", {
+    riskLevel: resolvedRisk.riskLevel,
+    riskScore: resolvedRisk.riskScore,
+    detectedCategories: resolvedRisk.detectedCategories.map((c) => c.key),
+    protectiveSignals: resolvedRisk.protectiveSignals,
   });
 
   const journal = await journalModel.createJournal(req.user.id, {
-  title: title.trim(),
-  content: trimmedContent,
-  mood: emotionToEmoji(finalEmotion),
-  emotion: finalEmotion,
-  sentimentScore: sentimentToScore(
-    analysis.sentiment?.scores
-  ),
-  insight: buildJournalSummary(analysis),
-
-  // Preserve the Python risk assessment in the journal record.
-  riskLevel: analysis.risk?.risk_level || "low",
-  riskScore:
-    typeof analysis.risk?.risk_score === "number"
-      ? analysis.risk.risk_score
-      : 0,
-});
+    title: title.trim(),
+    content: trimmedContent,
+    mood: emotionToEmoji(finalEmotion),
+    emotion: finalEmotion,
+    secondaryEmotions: resolvedEmotion.secondaryEmotions,
+    sentimentScore: sentimentToScore(analysis.sentiment?.scores),
+    riskAnalysis,
+    insight: buildJournalSummary(analysis),
+  });
 
   // NOTE: We intentionally do NOT auto-create a mood check-in record
-  // here anymore. A journal entry is not the same thing as an explicit
-  // mood check-in, and auto-creating one on every journal entry was
-  // polluting mood analytics (average score, emotion distribution,
-  // etc). Explicit mood check-ins now only come from POST /api/moods.
-  // GET /api/moods/today-analysis combines both signals without
-  // conflating them -- see moodAnalysisService.js.
+  // here. A journal entry is not the same thing as an explicit mood
+  // check-in -- see moodAnalysisService.js.
 
   // 3. Return the saved journal AND the full ML analysis (including
   //    goemotions detail and the full risk breakdown) so the frontend

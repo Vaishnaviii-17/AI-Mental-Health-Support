@@ -8,207 +8,100 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 class MentalHealthPredictor:
     """
-    Unified inference layer for the two trained models.
+    Unified inference layer built around a single trained model:
+    GoEmotions (28-label, multi-label / sigmoid).
 
-    Model 1:
-        6-class emotion model
-        sadness, joy, love, anger, fear, surprise
-
-    Model 2:
-        GoEmotions model
-        Used for sentiment interpretation, engineering risk
-        screening, and (as of this version) as the deciding
-        corroboration signal for the final emotion -- see
-        "FINAL EMOTION SELECTION" below.
-
-    Architecture:
-
-        Primary model:
-            6-class emotion classification. This is a FORCED-CHOICE
-            softmax over exactly six categories -- it has no
-            neutral/low-intensity/approval option. That means it can
-            be extremely confident (even ~100%) on inputs that don't
-            genuinely belong to any of its six categories, because it
-            is mathematically incapable of expressing "none of the
-            above". Its raw confidence/margin therefore cannot be
-            trusted in isolation.
-
-        GoEmotions:
-            28-label multi-label model (sigmoid). Independently used
-            for sentiment and risk analysis (unchanged). It is ALSO
-            now used to independently corroborate (or veto) the
-            primary model's pick before that pick is trusted -- see
-            select_final_emotion().
-
-        Final emotion selection (select_final_emotion):
-            The primary model's pick is used as-is ONLY when both
-            (a) the primary model's own confidence/margin are healthy,
-            AND (b) GoEmotions independently assigns meaningful
-            probability mass to that SAME category. If GoEmotions'
-            combined mass across all six categories is low (i.e. the
-            input is dominated by GoEmotions labels the six-class
-            schema has no slot for, e.g. "approval", "neutral",
-            "realization"), the result is the explicit sentinel
-            emotion "neutral" -- which is intentionally OUTSIDE the
-            six supported labels. Otherwise, if GoEmotions clearly
-            supports a specific (possibly different) one of the six
-            categories, that category is used instead.
-
+    ARCHITECTURE (GoEmotions-only)
     -------------------------------------------------------------
-    SCHEMA NOTE
+        Journal text
+            |
+            v
+         GoEmotions
+            |
+      +-----+------+-------------+
+      |            |             |
+      v            v             v
+    emotion     sentiment       risk
+
+      |
+      v
+
+    dominant emotion + secondary/supporting emotions
+
+    HISTORY / WHY THE 6-CLASS MODEL WAS REMOVED
     -------------------------------------------------------------
-    The application's `emotion` column / mlMapping.js SUPPORTED_EMOTIONS
-    set only accepts the six original labels. "neutral" is a
-    DELIBERATE out-of-schema sentinel: mlMapping.js's existing
-    validity guard already drops any value outside SUPPORTED_EMOTIONS
-    rather than storing it (logging a warning), so a low-intensity /
-    unclassifiable result safely results in a null `emotion` column
-    instead of a fabricated, misleading six-class label. No changes
-    to mlMapping.js, journalController.js, or the frontend are
-    required or made by this fix.
+    This predictor previously also loaded a separate 6-class
+    "primary" emotion model and ran a multi-step arbitration
+    process on every request. That architecture has been removed
+    entirely. GoEmotions (28-label, multi-label) is the SOLE source
+    of emotion detection. It also continues to independently power
+    sentiment and risk analysis, exactly as before -- risk is a
+    separate analysis layer and is never simply equated with
+    emotion (see calculate_risk_assessment()).
+
+    RISK SCREENING -- WHAT IT IS AND IS NOT
+    -------------------------------------------------------------
+    calculate_risk_assessment() is a HEURISTIC SCREENING signal,
+    combining:
+      - regex-based text pattern detection (suicidal ideation,
+        self-harm, hopelessness, feeling trapped, severe distress),
+      - GoEmotions-derived distress/protective emotion weighting,
+      - simple protective-language detection.
+
+    It is NOT a clinical assessment, it does NOT diagnose any
+    condition, and it must never be presented to the user as such.
+    All UI copy referencing this feature should say things like
+    "risk screening" / "heuristic screening indicator" / "not a
+    clinical assessment" -- never "you are suicidal" or "you have
+    depression".
+
+    Risk is fully separate from emotion: a journal entry can carry
+    strong fear/nervousness signals and still score LOW risk,
+    because risk is computed from its own emotion weighting + text
+    pattern detection + protective signals, not from the dominant
+    emotion label.
     """
 
     MAX_LENGTH = 128
 
     # -------------------------------------------------------------
-    # PRIMARY MODEL CONFIDENCE / AMBIGUITY SETTINGS
+    # EMOTION RESOLUTION THRESHOLDS
     # -------------------------------------------------------------
+    # Starting values only -- NOT scientifically validated. Tune
+    # against real journal data / threshold_config.json before
+    # relying on these in production.
 
-    # Minimum confidence required for the primary model to be
-    # considered reliable.
-    PRIMARY_CONFIDENCE_THRESHOLD = 0.60
-
-    # Minimum difference required between the first and second
-    # primary-model predictions.
-    #
-    # Example:
-    # joy = 0.72
-    # sadness = 0.30
-    # margin = 0.42
-    #
-    # This is clearly separated.
-    #
-    # But:
-    # joy = 0.38
-    # sadness = 0.34
-    # margin = 0.04
-    #
-    # This is ambiguous.
-    PRIMARY_MARGIN_THRESHOLD = 0.15
-
-    EMOTION_LABELS = [
-        "sadness",
-        "joy",
-        "love",
-        "anger",
-        "fear",
-        "surprise",
-    ]
+    DOMINANT_EMOTION_MIN = 0.15
+    SECONDARY_EMOTION_THRESHOLD = 0.10
+    MAX_SECONDARY_EMOTIONS = 4
 
     # -------------------------------------------------------------
-    # GOEMOTIONS -> SIX-CLASS COMPATIBILITY MAPPING
+    # LONG-ENTRY EMOTION AGGREGATION
     # -------------------------------------------------------------
-    #
-    # This is NOT a claim that these emotions are clinically
-    # equivalent. It is only a deterministic compatibility
-    # mapping used to translate GoEmotions' finer-grained labels
-    # into the six categories the rest of the application
-    # (database, frontend, journalController) already expects.
-    #
-    # Any GoEmotions label not listed here (e.g. "neutral",
-    # "approval", "curiosity", "admiration", "realization",
-    # "disapproval", "disappointment"... note "disappointment" IS
-    # mapped below, to sadness) is simply ignored when computing
-    # the aggregated fallback / coverage scores. That is precisely
-    # what makes SIX_CLASS_COVERAGE_THRESHOLD (see
-    # select_final_emotion) a meaningful signal: a text whose
-    # GoEmotions mass sits almost entirely in unmapped labels is a
-    # text none of the six categories genuinely describes.
-    GOEMOTIONS_TO_SIX_MAP = {
-        "sadness": "sadness",
-        "grief": "sadness",
-        "disappointment": "sadness",
-        "remorse": "sadness",
-        "loneliness": "sadness",
+    # A journal entry at or above this many words is treated as
+    # "long": instead of a single GoEmotions pass over the whole
+    # entry (which effectively only "sees" the first MAX_LENGTH
+    # tokens and collapses everything into one dominant emotion),
+    # the entry is split into sentence-aware chunks, each chunk is
+    # run through the SAME predict_goemotions() call, and the
+    # per-chunk results are aggregated (see
+    # aggregate_chunk_probabilities()) before dominant/secondary
+    # resolution. Entries below this threshold keep the exact
+    # single-pass behavior that existed before this change -- no
+    # extra model calls, no behavior change for short entries.
+    LONG_ENTRY_WORD_THRESHOLD = 40
 
-        "joy": "joy",
-        "amusement": "joy",
-        "excitement": "joy",
-        "optimism": "joy",
-        "relief": "joy",
-        "pride": "joy",
-        "gratitude": "joy",
+    # Target words per chunk when grouping sentences together.
+    # Chosen to comfortably fit under MAX_LENGTH (128 tokens) for
+    # ordinary journal-style sentences, while keeping the number of
+    # chunks (and therefore model calls) per entry reasonable.
+    CHUNK_WORD_TARGET = 40
 
-        "love": "love",
-        "caring": "love",
-        "affection": "love",
-        "desire": "love",
-
-        "anger": "anger",
-        "annoyance": "anger",
-        "rage": "anger",
-        "frustration": "anger",
-        "disgust": "anger",
-
-        "fear": "fear",
-        "nervousness": "fear",
-        "anxiety": "fear",
-        "apprehension": "fear",
-
-        "surprise": "surprise",
-        "confusion": "surprise",
-    }
-
-    # Minimum raw aggregated score the top fallback category must
-    # reach to be considered a meaningful signal. Below this, the
-    # fallback still returns the top category (to keep the
-    # existing six-label contract intact) but flags the result as
-    # ambiguous via `fallback_was_ambiguous`.
-    FALLBACK_MIN_SIGNAL_THRESHOLD = 0.15
-
-    # Minimum normalized margin between the top and second
-    # aggregated fallback categories. Below this, the fallback
-    # result is flagged as ambiguous.
-    FALLBACK_MIN_MARGIN = 0.05
-
-    # -------------------------------------------------------------
-    # FINAL EMOTION SELECTION THRESHOLDS (NEW)
-    # -------------------------------------------------------------
-    #
-    # These two thresholds are intentionally NOT the same knobs as
-    # PRIMARY_CONFIDENCE_THRESHOLD / PRIMARY_MARGIN_THRESHOLD above.
-    # Turning those two down would only make the primary model
-    # defer to GoEmotions more often when *it itself* is unsure --
-    # it does nothing for the case that actually broke ("i am ok"),
-    # where the primary model is fully confident and unambiguous
-    # but simply wrong, because none of its six categories applies.
-    # These two thresholds instead measure whether GoEmotions
-    # independently corroborates the primary model's pick at all.
-
-    # Minimum TOTAL GoEmotions probability mass mapped across ALL
-    # SIX primary-model categories combined (see
-    # GOEMOTIONS_TO_SIX_MAP). This does not care which category
-    # wins -- it measures whether GoEmotions considers *any* of the
-    # six categories relevant. A low value means the input is
-    # dominated by GoEmotions labels with no six-class equivalent
-    # (e.g. "approval", "neutral", "realization"), regardless of
-    # how confident the forced six-way primary softmax is.
-    SIX_CLASS_COVERAGE_THRESHOLD = 0.30
-
-    # Minimum GoEmotions-aggregated mass specifically for the SAME
-    # category the primary model chose. Even when overall six-class
-    # coverage clears SIX_CLASS_COVERAGE_THRESHOLD, the primary
-    # model's specific pick still needs some independent
-    # corroboration from GoEmotions before being trusted outright.
-    PRIMARY_COROBORATION_THRESHOLD = 0.15
-
-    # Minimum aggregated GoEmotions score required before a
-    # different six-class emotion can override the primary model.
-    GOEMOTIONS_OVERRIDE_MIN_SIGNAL = 0.30
-
-    # Minimum advantage the GoEmotions top category must have
-    # over the primary model's category before overriding it.
-    GOEMOTIONS_OVERRIDE_MARGIN = 0.10
+    # Hard cap on the number of chunks analyzed per entry, so a
+    # single very long journal entry can't trigger an unbounded
+    # number of model calls. Sentences are grouped to stay under
+    # this cap wherever possible (see _build_emotion_chunks).
+    MAX_EMOTION_CHUNKS = 12
 
     def __init__(self, base_dir=None):
         # ---------------------------------------------------------
@@ -219,10 +112,6 @@ class MentalHealthPredictor:
             base_dir = Path(__file__).resolve().parent.parent
 
         self.base_dir = Path(base_dir)
-
-        self.emotion_model_path = (
-            self.base_dir / "models" / "emotion_model"
-        )
 
         self.goemotions_model_path = (
             self.base_dir / "models" / "goemotions_emotion_model"
@@ -263,6 +152,8 @@ class MentalHealthPredictor:
 
         self.label2id = self.label_mapping["label2id"]
 
+        self.has_neutral_label = "neutral" in self.label2id
+
         self.per_label_thresholds = self.threshold_config.get(
             "per_label_thresholds", {}
         )
@@ -290,22 +181,7 @@ class MentalHealthPredictor:
         )
 
         # ---------------------------------------------------------
-        # LOAD MODEL 1
-        # ---------------------------------------------------------
-
-        print("Loading 6-class emotion model...")
-
-        self.emotion_tokenizer = AutoTokenizer.from_pretrained(
-            str(self.emotion_model_path)
-        )
-        self.emotion_model = AutoModelForSequenceClassification.from_pretrained(
-            str(self.emotion_model_path)
-        )
-        self.emotion_model.to(self.device)
-        self.emotion_model.eval()
-
-        # ---------------------------------------------------------
-        # LOAD MODEL 2
+        # LOAD MODEL -- GOEMOTIONS (the only model loaded)
         # ---------------------------------------------------------
 
         print("Loading GoEmotions model...")
@@ -319,20 +195,15 @@ class MentalHealthPredictor:
         self.goemotions_model.to(self.device)
         self.goemotions_model.eval()
 
-        print("Both models loaded successfully.")
+        print("GoEmotions model loaded successfully.")
         print(
-             "🔥 ACTUAL PREDICTOR FILE:",
-            Path(__file__).resolve()
+            "Emotion resolution thresholds -- DOMINANT_EMOTION_MIN:",
+            self.DOMINANT_EMOTION_MIN,
+            "| SECONDARY_EMOTION_THRESHOLD:",
+            self.SECONDARY_EMOTION_THRESHOLD,
+            "| has_neutral_label:",
+            self.has_neutral_label,
         )
-        print(
-            "🔥 SIX_CLASS_COVERAGE_THRESHOLD:",
-            self.SIX_CLASS_COVERAGE_THRESHOLD
-        )
-        print(
-            "🔥 PRIMARY_COROBORATION_THRESHOLD:",
-            self.PRIMARY_COROBORATION_THRESHOLD
-        )
-
 
     # =============================================================
     # UTILITY
@@ -344,85 +215,15 @@ class MentalHealthPredictor:
             return json.load(f)
 
     # =============================================================
-    # MODEL 1 — PRIMARY EMOTION
-    # =============================================================
-
-    def predict_primary_emotion(self, text):
-        """
-        Predict the primary emotion using the trained 6-class
-        emotion model.
-
-        Also determines whether the prediction is confident enough
-        to be trusted on its own, or whether it is low-confidence /
-        ambiguous. NOTE: this flag alone is no longer sufficient to
-        decide the final emotion -- see select_final_emotion(),
-        which additionally requires GoEmotions corroboration even
-        when this flag is False.
-        """
-
-        inputs = self.emotion_tokenizer(
-            text,
-            return_tensors="pt",
-            truncation=True,
-            padding=True,
-            max_length=self.MAX_LENGTH,
-        )
-
-        inputs = {key: value.to(self.device) for key, value in inputs.items()}
-
-        with torch.no_grad():
-            outputs = self.emotion_model(**inputs)
-
-        probabilities = torch.softmax(outputs.logits, dim=1)[0]
-
-        predicted_index = torch.argmax(probabilities).item()
-        primary_emotion = self.EMOTION_LABELS[predicted_index]
-        confidence = float(probabilities[predicted_index].item())
-
-        top_values, top_indices = torch.topk(
-            probabilities, min(3, len(self.EMOTION_LABELS))
-        )
-
-        top_emotions = []
-        for value, index in zip(top_values, top_indices):
-            top_emotions.append({
-                "emotion": self.EMOTION_LABELS[index.item()],
-                "confidence": float(value.item()),
-            })
-
-        if len(top_emotions) > 1:
-            second_confidence = top_emotions[1]["confidence"]
-        else:
-            second_confidence = 0.0
-
-        margin = confidence - second_confidence
-
-        is_low_confidence = confidence < self.PRIMARY_CONFIDENCE_THRESHOLD
-        is_ambiguous = margin < self.PRIMARY_MARGIN_THRESHOLD
-        needs_goemotions_fallback = is_low_confidence or is_ambiguous
-
-        return {
-            "emotion": primary_emotion,
-            "confidence": confidence,
-            "top_emotions": top_emotions,
-            "second_confidence": second_confidence,
-            "margin": margin,
-            "is_low_confidence": is_low_confidence,
-            "is_ambiguous": is_ambiguous,
-            "needs_goemotions_fallback": needs_goemotions_fallback,
-            "source": "primary_model",
-        }
-
-    # =============================================================
-    # MODEL 2 — GOEMOTIONS
+    # GOEMOTIONS INFERENCE
     # =============================================================
 
     def predict_goemotions(self, text):
         """
-        Run GoEmotions multi-label prediction.
-
-        Sigmoid is used because GoEmotions is treated as a
-        multi-label classifier here.
+        Run GoEmotions multi-label prediction. Sigmoid is used
+        because GoEmotions is treated as a multi-label classifier
+        here (each label's probability is independent of the
+        others, unlike a softmax).
         """
 
         inputs = self.goemotions_tokenizer(
@@ -448,326 +249,67 @@ class MentalHealthPredictor:
         return results
 
     # =============================================================
-    # GOEMOTIONS -> SIX-CLASS AGGREGATION
+    # EMOTION RESOLUTION (dominant + secondary, GoEmotions-only)
     # =============================================================
 
-    def calculate_goemotions_fallback_scores(self, probabilities):
+    def get_dominant_and_secondary_emotions(self, probabilities):
         """
-        Aggregate GoEmotions probabilities into the six
-        primary-model emotion categories using GOEMOTIONS_TO_SIX_MAP.
-
-        For each supported emotion, the aggregated score is the sum
-        of the probabilities of every GoEmotions label that maps
-        onto it. GoEmotions labels with no mapping (e.g. "neutral",
-        "approval", "curiosity", "admiration") are ignored for this
-        calculation, though they remain visible in
-        goemotions.probabilities / goemotions.active_emotions.
-
-        Returns a dict with exactly the six supported emotions as
-        keys, defaulting to 0.0 when no mapped label is present.
-
-        This is also the basis of SIX_CLASS_COVERAGE_THRESHOLD in
-        select_final_emotion(): summing this dict's values tells you
-        how much of the input's total GoEmotions probability mass
-        maps to ANY six-class category at all.
+        Resolve the dominant emotion and up to MAX_SECONDARY_EMOTIONS
+        secondary/supporting emotions directly from raw GoEmotions
+        probabilities. GoEmotions labels are never collapsed or
+        mapped into any fixed schema.
         """
 
-        scores = {emotion: 0.0 for emotion in self.EMOTION_LABELS}
-
-        for label, probability in probabilities.items():
-            mapped_emotion = self.GOEMOTIONS_TO_SIX_MAP.get(label)
-
-            if mapped_emotion is None:
-                continue
-
-            scores[mapped_emotion] += probability
-
-        return scores
-
-    # =============================================================
-    # GOEMOTIONS FALLBACK SELECTOR
-    # =============================================================
-
-    def select_goemotions_emotion(self, probabilities):
-        """
-        Select the best-supported six-class category according to
-        GoEmotions alone (used by select_final_emotion() whenever
-        the primary model's pick needs reconsideration).
-
-        Unlike a raw GoEmotions argmax, this aggregates GoEmotions
-        probabilities into the six supported emotion categories (see
-        calculate_goemotions_fallback_scores) and selects the
-        highest-scoring supported category, so the fallback always
-        returns one of: sadness, joy, love, anger, fear, surprise.
-
-        `confidence` here is NOT a calibrated model confidence. It
-        is the normalized dominance of the selected category among
-        the six aggregated scores (i.e. how much of the aggregated
-        "mapped emotion mass" belongs to the winning category).
-        """
-
-        fallback_scores = self.calculate_goemotions_fallback_scores(probabilities)
+        if not probabilities:
+            return (
+                {
+                    "label": "neutral",
+                    "probability": None,
+                    "source": "goemotions_neutral_fallback",
+                },
+                [],
+            )
 
         ranked = sorted(
-            fallback_scores.items(), key=lambda item: item[1], reverse=True
+            probabilities.items(), key=lambda item: item[1], reverse=True
         )
+        top_label, top_score = ranked[0]
 
-        top_emotion, top_raw_score = ranked[0]
-        second_raw_score = ranked[1][1] if len(ranked) > 1 else 0.0
-
-        total = sum(fallback_scores.values())
-
-        if total > 0:
-            normalized_scores = {
-                emotion: score / total for emotion, score in fallback_scores.items()
+        if top_score >= self.DOMINANT_EMOTION_MIN:
+            dominant = {
+                "label": top_label,
+                "probability": float(top_score),
+                "source": "goemotions",
+            }
+        elif self.has_neutral_label:
+            dominant = {
+                "label": "neutral",
+                "probability": float(probabilities.get("neutral", 0.0)),
+                "source": "goemotions",
             }
         else:
-            normalized_scores = {emotion: 0.0 for emotion in fallback_scores}
-
-        top_normalized = normalized_scores[top_emotion]
-        second_normalized = (
-            normalized_scores[ranked[1][0]] if len(ranked) > 1 else 0.0
-        )
-
-        normalized_margin = top_normalized - second_normalized
-
-        # A meaningful signal requires both enough raw aggregated
-        # probability mass and enough separation from the runner up.
-        # When either is missing, we still return the top category
-        # (to preserve the six-label contract for anything calling
-        # this method directly) but flag it as ambiguous so the
-        # caller (select_final_emotion) can distinguish a genuinely
-        # strong fallback signal from a weak/neutral one.
-        fallback_was_ambiguous = (
-            top_raw_score < self.FALLBACK_MIN_SIGNAL_THRESHOLD
-            or normalized_margin < self.FALLBACK_MIN_MARGIN
-        )
-
-        top_goemotions_emotions = [
-            {"emotion": emotion, "score": score} for emotion, score in ranked[:3]
-        ]
-
-        return {
-            "emotion": top_emotion,
-            "confidence": float(top_normalized),
-            "source": "goemotions_fallback",
-            "scores": fallback_scores,
-            "top_goemotions_emotions": top_goemotions_emotions,
-            "fallback_was_ambiguous": fallback_was_ambiguous,
-        }
-
-    # =============================================================
-    # FINAL EMOTION SELECTION (NEW — see class docstring)
-    # =============================================================
-
-    def select_final_emotion(self, primary_emotion, goemotions_probabilities):
-        """
-        Decide the single final emotion for the response.
-
-        This is the ONLY place the final emotion is decided, and it
-        is a pure function of its two inputs (no I/O, no model
-        calls) so it can be unit-tested directly against the real
-        production logic without loading either trained model (see
-        test_predictor_emotion_selection.py).
-
-        Why this exists (see class docstring for the full
-        rationale): the primary 6-class model is a forced-choice
-        softmax with no neutral/low-intensity option, so its
-        confidence can be very high on inputs that don't genuinely
-        belong to any of its six categories. Lowering
-        PRIMARY_CONFIDENCE_THRESHOLD / PRIMARY_MARGIN_THRESHOLD
-        cannot fix this: the model will still confidently pick
-        *something* from its six options no matter how those two
-        knobs are tuned, because it has no other option to pick.
-        Instead we require independent corroboration from GoEmotions
-        before trusting the primary model's pick, regardless of how
-        confident that pick is:
-
-          1. needs_goemotions_fallback (existing signal): the
-             primary model's OWN confidence/margin was already weak.
-          2. six_class_coverage_is_low: GoEmotions assigns very
-             little combined probability mass to ANY of the six
-             categories -- the input is likely dominated by
-             neutral/mild GoEmotions labels the six-class schema has
-             no slot for (e.g. "approval", "neutral", "realization").
-          3. primary_uncorroborated: GoEmotions assigns very little
-             mass specifically to the category the primary model
-             picked, even if overall six-class coverage is decent
-             (i.e. GoEmotions supports a DIFFERENT category).
-
-        If none of the three trigger, the primary model's pick is
-        used as-is -- this preserves genuinely strong six-class
-        predictions (clearly joyful/sad/angry/fearful/loving/
-        surprised text keeps working exactly as before).
-
-        If any of them trigger, we defer to GoEmotions:
-          - If GoEmotions' own mapped category is itself strong and
-            unambiguous (see select_goemotions_emotion), use that
-            six-class category (source = "goemotions_fallback").
-          - Otherwise -- GoEmotions doesn't clearly support any of
-            the six categories either (the "i am ok" case) -- the
-            result is genuinely low-intensity/neutral. We return the
-            sentinel emotion "neutral", intentionally OUTSIDE the six
-            supported labels (source = "neutral_low_intensity").
-
-        Returns a dict containing the final emotion plus full
-        diagnostic metadata (primary_model_prediction,
-        primary_model_confidence, primary_model_margin,
-        primary_model_was_ambiguous, primary_model_was_low_confidence,
-        six_class_coverage, primary_category_support, source,
-        fallback_reason, ...).
-        """
-
-        fallback_scores = self.calculate_goemotions_fallback_scores(
-            goemotions_probabilities
-        )
-
-        six_class_coverage = sum(fallback_scores.values())
-
-        primary_category = primary_emotion["emotion"]
-
-        primary_category_support = fallback_scores.get(
-            primary_category,
-            0.0
-        )
-
-        # ---------------------------------------------------------
-        # FIND THE STRONGEST GOEMOTIONS-DERIVED SIX-CLASS CATEGORY
-        # ---------------------------------------------------------
-
-        ranked_fallback = sorted(
-            fallback_scores.items(),
-            key=lambda item: item[1],
-            reverse=True,
-        )
-
-        goemotions_top_category = ranked_fallback[0][0]
-        goemotions_top_score = ranked_fallback[0][1]
-
-        goemotions_second_score = (
-            ranked_fallback[1][1]
-            if len(ranked_fallback) > 1
-            else 0.0
-        )
-
-        goemotions_top_margin = (
-            goemotions_top_score - goemotions_second_score
-        )
-
-        # ---------------------------------------------------------
-        # DETERMINE WHETHER GOEMOTIONS DISAGREES WITH PRIMARY
-        # ---------------------------------------------------------
-
-        goemotions_supports_different_category = (
-            goemotions_top_category != primary_category
-            and goemotions_top_score >= self.GOEMOTIONS_OVERRIDE_MIN_SIGNAL
-            and (
-                goemotions_top_score - primary_category_support
-                >= self.GOEMOTIONS_OVERRIDE_MARGIN
-            )
-        )
-
-        six_class_coverage_is_low = (
-            six_class_coverage < self.SIX_CLASS_COVERAGE_THRESHOLD
-        )
-
-        primary_uncorroborated = (
-            primary_category_support < self.PRIMARY_COROBORATION_THRESHOLD
-        )
-
-        needs_reconsideration = (
-            primary_emotion["needs_goemotions_fallback"]
-            or six_class_coverage_is_low
-            or primary_uncorroborated
-            or goemotions_supports_different_category
-        )
-
-        diagnostics = {
-            "primary_model_prediction": primary_emotion["emotion"],
-            "primary_model_confidence": primary_emotion["confidence"],
-            "primary_model_margin": primary_emotion["margin"],
-            "primary_model_was_ambiguous": primary_emotion["is_ambiguous"],
-            "primary_model_was_low_confidence": primary_emotion["is_low_confidence"],
-            "top_emotions": primary_emotion["top_emotions"],
-            "six_class_coverage": six_class_coverage,
-            "six_class_coverage_is_low": six_class_coverage_is_low,
-            "primary_category_support": primary_category_support,
-            "primary_uncorroborated": primary_uncorroborated,
-            "goemotions_top_category": goemotions_top_category,
-            "goemotions_top_score": goemotions_top_score,
-            "goemotions_second_score": goemotions_second_score,
-            "goemotions_top_margin": goemotions_top_margin,
-            "goemotions_supports_different_category": goemotions_supports_different_category,
-            "fallback_scores": fallback_scores,
-        }
-
-        # ---------------------------------------------------------
-        # PATH 1: primary model trusted as-is (strong, corroborated)
-        # ---------------------------------------------------------
-        if not needs_reconsideration:
-            return {
-                "emotion": primary_emotion["emotion"],
-                "confidence": primary_emotion["confidence"],
-                "source": "primary_model",
-                "fallback_reason": None,
-                "fallback_was_ambiguous": False,
-                "top_goemotions_emotions": None,
-                **diagnostics,
+            dominant = {
+                "label": "neutral",
+                "probability": None,
+                "source": "goemotions_neutral_fallback",
             }
 
-        # ---------------------------------------------------------
-        # PATH 2 / 3: defer to GoEmotions
-        # ---------------------------------------------------------
-        goemotions_emotion = self.select_goemotions_emotion(goemotions_probabilities)
+        secondary = []
+        for label, score in ranked:
+            if label == dominant["label"]:
+                continue
+            if label == "neutral":
+                continue
+            if score < self.SECONDARY_EMOTION_THRESHOLD:
+                break
+            secondary.append({"label": label, "probability": float(score)})
+            if len(secondary) >= self.MAX_SECONDARY_EMOTIONS:
+                break
 
-        if primary_emotion["is_low_confidence"] and primary_emotion["is_ambiguous"]:
-            fallback_reason = "low_confidence_and_ambiguous_margin"
-        elif primary_emotion["is_low_confidence"]:
-            fallback_reason = "low_confidence"
-        elif primary_emotion["is_ambiguous"]:
-            fallback_reason = "ambiguous_margin"
-        elif six_class_coverage_is_low:
-            fallback_reason = "low_six_class_coverage"
-        elif goemotions_supports_different_category:
-            fallback_reason = "goemotions_disagrees_with_primary"
-        elif primary_uncorroborated:
-            fallback_reason = "primary_uncorroborated_by_goemotions"
-        else:
-            fallback_reason = "primary_uncorroborated_by_goemotions"
-
-        goemotions_supports_a_category = not goemotions_emotion["fallback_was_ambiguous"]
-
-        if six_class_coverage_is_low or not goemotions_supports_a_category:
-            # Neither the primary model's pick NOR GoEmotions' own
-            # mapped fallback genuinely supports any of the six
-            # categories. This is the "i am ok" case: return the
-            # neutral sentinel instead of forcing an arbitrary
-            # six-class label.
-            return {
-                "emotion": "neutral",
-                "confidence": goemotions_probabilities.get("neutral", 0.0),
-                "source": "neutral_low_intensity",
-                "fallback_reason": fallback_reason,
-                "fallback_was_ambiguous": True,
-                "top_goemotions_emotions": goemotions_emotion["top_goemotions_emotions"],
-                **diagnostics,
-            }
-
-        # GoEmotions clearly and independently supports one of the
-        # six categories (possibly different from the primary
-        # model's pick) -- use it.
-        return {
-            "emotion": goemotions_emotion["emotion"],
-            "confidence": goemotions_emotion["confidence"],
-            "source": "goemotions_fallback",
-            "fallback_reason": fallback_reason,
-            "fallback_was_ambiguous": goemotions_emotion["fallback_was_ambiguous"],
-            "top_goemotions_emotions": goemotions_emotion["top_goemotions_emotions"],
-            **diagnostics,
-        }
+        return dominant, secondary
 
     # =============================================================
-    # ACTIVE GOEMOTIONS
+    # ACTIVE GOEMOTIONS (per-label threshold view, unchanged)
     # =============================================================
 
     def get_active_emotions(self, probabilities):
@@ -788,7 +330,298 @@ class MentalHealthPredictor:
         return active
 
     # =============================================================
-    # SENTIMENT (UNCHANGED)
+    # LONG-ENTRY EMOTION SEGMENTATION + AGGREGATION
+    # -------------------------------------------------------------
+    # This is additive to the single-pass GoEmotions flow above --
+    # it does not change predict_goemotions(), the dominant/
+    # secondary resolution logic, or how risk/sentiment are
+    # computed. It only decides WHAT probabilities get fed into
+    # get_dominant_and_secondary_emotions() for long entries.
+    # =============================================================
+
+    @staticmethod
+    def _split_into_sentences(text):
+        """
+        Sentence-aware splitter used to build emotion-analysis
+        chunks. Kept separate from the risk pipeline's own
+        _split_sentences() so this can evolve independently without
+        any chance of affecting risk-pattern scoping.
+        """
+        pieces = re.split(r"(?<=[.!?])\s+", text.strip())
+        pieces = [p.strip() for p in pieces if p.strip()]
+        return pieces
+
+    def _build_emotion_chunks(self, text):
+        """
+        Group the entry into sentence-aware chunks of roughly
+        CHUNK_WORD_TARGET words each, so each chunk stays well
+        under the model's MAX_LENGTH token budget and the total
+        number of chunks stays within MAX_EMOTION_CHUNKS.
+
+        - Sentences are never split apart to hit a target -- chunks
+          are built by accumulating whole sentences until adding
+          another would exceed the word target, then starting a
+          new chunk.
+        - The one exception is a single "sentence" that is itself
+          longer than the target (e.g. a run-on line with no
+          punctuation) -- that is chunked by word count as a
+          fallback so it still fits the model's input window
+          instead of being silently truncated.
+        """
+        sentences = self._split_into_sentences(text)
+        if not sentences:
+            return [text] if text else []
+
+        chunks = []
+        current_words = []
+
+        def flush():
+            if current_words:
+                chunks.append(" ".join(current_words))
+
+        for sentence in sentences:
+            words = sentence.split()
+
+            # Fallback: an over-long "sentence" (no punctuation to
+            # split on) is chunked by word count on its own so it
+            # doesn't blow past the model's input window.
+            if len(words) > self.CHUNK_WORD_TARGET * 1.5:
+                flush()
+                current_words = []
+                for i in range(0, len(words), self.CHUNK_WORD_TARGET):
+                    chunks.append(" ".join(words[i:i + self.CHUNK_WORD_TARGET]))
+                continue
+
+            if current_words and (
+                len(current_words) + len(words) > self.CHUNK_WORD_TARGET
+            ):
+                flush()
+                current_words = []
+
+            current_words.extend(words)
+
+        flush()
+
+        # Respect the hard cap on chunk count. If sentence-aware
+        # grouping still produced too many chunks (very long entry),
+        # merge adjacent chunks pairwise until under the cap rather
+        # than dropping any content.
+        while len(chunks) > self.MAX_EMOTION_CHUNKS:
+            merged = []
+            for i in range(0, len(chunks), 2):
+                if i + 1 < len(chunks):
+                    merged.append(chunks[i] + " " + chunks[i + 1])
+                else:
+                    merged.append(chunks[i])
+            chunks = merged
+
+        return chunks
+
+    def aggregate_chunk_probabilities(self, chunk_probability_dicts):
+        """
+        Combine per-chunk GoEmotions probability dicts into a single
+        aggregated probability profile for the whole entry.
+
+        METHOD (transparent, documented on purpose):
+        For each label, three signals are computed across all
+        chunks and blended:
+
+          - mean_prob:      average probability for that label
+                             across every chunk -- rewards emotions
+                             that show up consistently.
+          - max_prob:        the single highest probability seen for
+                             that label in any one chunk -- rewards
+                             emotions that appear strongly even if
+                             only briefly (e.g. one sharp moment of
+                             anger in an otherwise calm entry).
+          - presence_ratio:  fraction of chunks where the label
+                             cleared SECONDARY_EMOTION_THRESHOLD --
+                             rewards emotions that recur across the
+                             entry rather than appearing once.
+
+        aggregated_score = 0.5 * mean_prob + 0.3 * max_prob + 0.2 * presence_ratio
+
+        This intentionally does NOT simply take the single highest
+        probability from any one chunk -- that would just reproduce
+        the original "one dominant emotion" problem at chunk
+        granularity instead of paragraph granularity.
+        """
+        if not chunk_probability_dicts:
+            return {}
+
+        num_chunks = len(chunk_probability_dicts)
+        all_labels = chunk_probability_dicts[0].keys()
+
+        aggregated = {}
+        for label in all_labels:
+            values = [chunk.get(label, 0.0) for chunk in chunk_probability_dicts]
+            mean_prob = sum(values) / num_chunks
+            max_prob = max(values)
+            presence_ratio = sum(
+                1 for v in values if v >= self.SECONDARY_EMOTION_THRESHOLD
+            ) / num_chunks
+
+            aggregated[label] = (
+                0.5 * mean_prob + 0.3 * max_prob + 0.2 * presence_ratio
+            )
+
+        return aggregated
+
+    def predict_goemotions_aggregated(self, text, raw_probabilities):
+        """
+        Decide whether `text` needs long-entry chunk aggregation and
+        return (probabilities_for_emotion_resolution, meta).
+
+        Short entries (< LONG_ENTRY_WORD_THRESHOLD words) reuse
+        `raw_probabilities` -- the SAME single-pass result already
+        computed in analyze() -- so short entries make no extra
+        model calls and behave exactly as before this change.
+
+        Long entries are segmented via _build_emotion_chunks(), each
+        chunk is run through the existing predict_goemotions(), and
+        the results are combined with aggregate_chunk_probabilities().
+        """
+        word_count = len(text.split())
+
+        if word_count < self.LONG_ENTRY_WORD_THRESHOLD:
+            return raw_probabilities, {
+                "is_long_entry": False,
+                "chunk_count": 1,
+                "chunks": None,
+            }
+
+        chunks = self._build_emotion_chunks(text)
+
+        if len(chunks) <= 1:
+            # Segmentation didn't actually produce multiple chunks
+            # (e.g. one giant run-on sentence just under the cap) --
+            # no benefit to aggregating a single chunk against
+            # itself, so just reuse the raw single-pass result.
+            return raw_probabilities, {
+                "is_long_entry": False,
+                "chunk_count": 1,
+                "chunks": None,
+            }
+
+        chunk_probability_dicts = [self.predict_goemotions(chunk) for chunk in chunks]
+        aggregated_probabilities = self.aggregate_chunk_probabilities(
+            chunk_probability_dicts
+        )
+
+        # Per-chunk dominant label, kept for debug logging only --
+        # never surfaced to the production UI.
+        chunk_summaries = []
+        for chunk_text, chunk_probs in zip(chunks, chunk_probability_dicts):
+            top_label, top_score = max(chunk_probs.items(), key=lambda kv: kv[1])
+            chunk_summaries.append({
+                "text": chunk_text,
+                "top_label": top_label,
+                "top_score": round(top_score, 4),
+            })
+
+        return aggregated_probabilities, {
+            "is_long_entry": True,
+            "chunk_count": len(chunks),
+            "chunks": chunk_summaries,
+        }
+
+    # =============================================================
+    # OVERALL EMOTIONAL REFLECTION (deterministic, template-based)
+    # -------------------------------------------------------------
+    # No LLM/generative integration currently exists in this
+    # project's inference layer, so this is a deterministic,
+    # template-based summary built directly from the actual
+    # detected dominant/secondary emotions -- never a hardcoded
+    # example, never inventing emotions that weren't detected, and
+    # never phrased as a diagnosis or clinical claim. If an LLM
+    # integration is added to this project later, it can replace
+    # the templating below with a generated summary using this same
+    # dominant/secondary input -- the calling shape (analyze()
+    # returning a `reflection.summary` string) would not need to
+    # change.
+    # =============================================================
+
+    def generate_emotional_reflection(self, dominant_emotion, secondary_emotions):
+        dominant_label = dominant_emotion.get("label") or "neutral"
+
+        if dominant_label == "neutral" and not secondary_emotions:
+            return "Your entry reads as fairly even in tone, without one emotion clearly standing out."
+
+        secondary_labels = [item["label"] for item in secondary_emotions]
+
+        positive_labels = [
+            l for l in [dominant_label] + secondary_labels
+            if l in self.positive_emotions
+        ]
+        negative_labels = [
+            l for l in [dominant_label] + secondary_labels
+            if l in self.negative_emotions
+        ]
+
+        # De-duplicate while preserving first-seen order (dominant
+        # emotion first, then secondary emotions in their existing
+        # rank order).
+        def dedupe(items):
+            seen = set()
+            ordered = []
+            for item in items:
+                if item not in seen:
+                    seen.add(item)
+                    ordered.append(item)
+            return ordered
+
+        positive_labels = dedupe(positive_labels)
+        negative_labels = dedupe(negative_labels)
+
+        # Only a single detected emotion (typical for short entries)
+        # -- keep this to one plain sentence rather than forcing the
+        # two-part "mix of X, despite Y" template below.
+        if not secondary_labels:
+            return f"Your entry mainly reflects a sense of {dominant_label}."
+
+        lead_labels = dedupe([dominant_label] + secondary_labels[:2])
+        lead_text = self._join_labels(lead_labels)
+
+        if positive_labels and negative_labels:
+            other_negative = [l for l in negative_labels if l not in lead_labels]
+            other_positive = [l for l in positive_labels if l not in lead_labels]
+            contrast_labels = dedupe(other_negative + other_positive) or dedupe(
+                negative_labels + positive_labels
+            )
+            contrast_labels = [l for l in contrast_labels if l not in lead_labels] or contrast_labels
+            contrast_text = self._join_labels(contrast_labels[:3])
+
+            return (
+                f"Your entry reflects a mix of {lead_text}, alongside moments of "
+                f"{contrast_text}. Both the harder and the more hopeful feelings "
+                f"come through across the entry."
+            )
+
+        # All-positive or all-negative (or neutral-heavy) entries --
+        # single-tone summary, still built only from detected labels.
+        remaining = [l for l in dedupe([dominant_label] + secondary_labels) if l not in lead_labels]
+        if remaining:
+            remaining_text = self._join_labels(remaining[:2])
+            return (
+                f"Your entry reflects a mix of {lead_text}, along with touches of "
+                f"{remaining_text} running through it."
+            )
+
+        return f"Your entry reflects a mix of {lead_text} running through it."
+
+    @staticmethod
+    def _join_labels(labels):
+        """'joy' / 'joy and hope' / 'joy, hope, and pride'"""
+        if not labels:
+            return ""
+        if len(labels) == 1:
+            return labels[0]
+        if len(labels) == 2:
+            return f"{labels[0]} and {labels[1]}"
+        return f"{', '.join(labels[:-1])}, and {labels[-1]}"
+
+    # =============================================================
+    # SENTIMENT (UNCHANGED -- separate from emotion)
     # =============================================================
 
     def calculate_sentiment(self, probabilities):
@@ -820,29 +653,55 @@ class MentalHealthPredictor:
         return {"label": sentiment, "scores": scores}
 
     # =============================================================
-    # RISK PATTERNS (UNCHANGED)
+    # RISK PATTERNS
+    # -------------------------------------------------------------
+    # These are intentionally-broadened but still reasonably precise
+    # regexes -- not an exhaustive keyword dump. Each pattern is a
+    # phrase-level match (word-boundary anchored) rather than a
+    # single loose keyword, to keep the false-positive rate down.
+    #
+    # NOTE ON "(don't|do not) want to live/be alive" style patterns:
+    # the negation word here is semantically part of the risk
+    # statement itself (the person IS expressing they don't want to
+    # live), so these patterns intentionally include the negation
+    # word inside the match. The generic negation suppression below
+    # only looks at words BEFORE a match, so these are unaffected by
+    # it (see _is_negated).
     # =============================================================
 
     RISK_PATTERNS = {
         "suicidal_ideation": [
-            r"\bkill myself\b",
+            r"\bkill(ing)? myself\b",
+            r"\bmight kill myself\b",
             r"\bend my life\b",
             r"\bend it all\b",
-            r"\bdon't want to live\b",
-            r"\bdo not want to live\b",
-            r"\bwant to die\b",
+            r"\bdon'?t want to live(?: anymore)?\b",
+            r"\bdo not want to live(?: anymore)?\b",
+            r"\bdon'?t want to be alive\b",
+            r"\bdo not want to be alive\b",
+            r"\bwant(?:s|ed)? to die\b",
             r"\bwish i were dead\b",
             r"\bwish i was dead\b",
-            r"\bsuicid(e|al)\b",
+            r"\bsuicid(?:e|al)\b",
+            r"\bthinking about suicide\b",
+            r"\bthoughts? of suicide\b",
+            r"\bwant to end my life\b",
+            r"\bno point in living\b",
+            r"\bno point living\b",
+            r"\blife (?:isn'?t|is not) worth living\b",
+            r"\bnot worth living\b",
+            r"\bcan'?t go on\b",
+            r"\bcan'?t do this anymore\b",
+            r"\bcannot do this anymore\b",
         ],
 
         "self_harm": [
-            r"\bhurt myself\b",
-            r"\bharm myself\b",
-            r"\bself[- ]harm\b",
-            r"\bcut myself\b",
-            r"\bcutting myself\b",
-            r"\bself[- ]injur(y|e|ing)\b",
+            r"\bhurt(?:ing)? myself\b",
+            r"\bharm(?:ing)? myself\b",
+            r"\bself[- ]harm(?:ing)?\b",
+            r"\bself[- ]injur(?:y|e|ing)\b",
+            r"\bcut(?:ting)? myself\b",
+            r"\bbeen self[- ]harming\b",
         ],
 
         "hopelessness": [
@@ -858,19 +717,20 @@ class MentalHealthPredictor:
 
         "feeling_trapped": [
             r"\btrapped\b",
-            r"\bcan't escape\b",
+            r"\bcan'?t escape\b",
             r"\bcannot escape\b",
             r"\bno way out\b",
             r"\bnowhere to go\b",
+            r"\bnowhere to turn\b",
         ],
 
         "severe_distress": [
             r"\bcompletely overwhelmed\b",
-            r"\bcan't cope\b",
+            r"\bcan'?t cope\b",
             r"\bcannot cope\b",
             r"\bbreaking down\b",
             r"\bfalling apart\b",
-            r"\bcan't take this anymore\b",
+            r"\bcan'?t take this anymore\b",
             r"\bcannot take this anymore\b",
             r"\btoo much to handle\b",
         ],
@@ -894,25 +754,118 @@ class MentalHealthPredictor:
         r"\bthankful\b",
     ]
 
+    # -------------------------------------------------------------
+    # CONTEXT HANDLING -- NEGATION / THIRD-PARTY (lightweight)
+    # -------------------------------------------------------------
+    # LIMITATION: this is plain regex/keyword heuristics, not real
+    # NLP. It will not catch every negation or reported-speech
+    # construction, and it can still be fooled by unusual phrasing
+    # (double negatives, sarcasm, negation several clauses away,
+    # etc). It is a best-effort reduction of the most common false
+    # positives ("I'm not suicidal", "my friend said he wanted to
+    # die"), not a guarantee of correct context understanding.
+    # -------------------------------------------------------------
+
+    NEGATION_CUE_PATTERN = re.compile(
+        r"\b(not|never|no longer|isn'?t|aren'?t|wasn'?t|weren'?t|"
+        r"don'?t|doesn'?t|didn'?t|won'?t|wouldn'?t|can'?t say)\b",
+        flags=re.IGNORECASE,
+    )
+
+    # How many characters before a match to scan for a negation cue.
+    NEGATION_WINDOW_CHARS = 40
+
+    FIRST_PERSON_PATTERN = re.compile(
+        r"\b(i|i'm|i've|i'll|i'd)\b", flags=re.IGNORECASE
+    )
+
+    THIRD_PARTY_CUE_PATTERN = re.compile(
+        r"\b(my friend|a friend|he|she|him|her|they|them|someone|"
+        r"my brother|my sister|my mom|my dad|my coworker|my colleague)\b",
+        flags=re.IGNORECASE,
+    )
+
+    @staticmethod
+    def _split_sentences(text):
+        """
+        Very small sentence splitter used only to scope negation /
+        third-party checks to the clause the match actually occurs
+        in, rather than the whole journal entry. Not linguistically
+        rigorous -- good enough for this heuristic screening layer.
+        """
+        pieces = re.split(r"(?<=[.!?])\s+", text.strip())
+        return [p for p in pieces if p]
+
+    def _is_negated(self, sentence, match_start):
+        """
+        Returns True if a negation cue appears shortly before the
+        match within the same sentence. This intentionally only
+        looks at the text BEFORE the match, so patterns that already
+        bake a negation word into the phrase itself (e.g. "don't
+        want to live") are unaffected -- that negation is part of
+        the match span, not the preceding window.
+        """
+        window_start = max(0, match_start - self.NEGATION_WINDOW_CHARS)
+        window = sentence[window_start:match_start]
+        return bool(self.NEGATION_CUE_PATTERN.search(window))
+
+    def _is_third_party(self, sentence):
+        """
+        Returns True when a sentence appears to describe someone
+        else's experience (e.g. "my friend said he wanted to die")
+        rather than the journal author's own -- i.e. no first-person
+        pronoun is present but a third-party cue is. Deliberately
+        conservative: if a first-person pronoun is anywhere in the
+        sentence, we do NOT treat it as third-party, since journal
+        entries often mix "I" with references to other people.
+        """
+        if self.FIRST_PERSON_PATTERN.search(sentence):
+            return False
+        return bool(self.THIRD_PARTY_CUE_PATTERN.search(sentence))
+
     # =============================================================
-    # TEXT RISK DETECTION (UNCHANGED)
+    # TEXT RISK DETECTION
+    # -------------------------------------------------------------
+    # Scans sentence-by-sentence so negation/third-party context
+    # checks are scoped correctly. Returns (detected, third_party)
+    # where `detected` has the same shape as before (category ->
+    # list of matched pattern strings) and `third_party` is a list
+    # of {category, pattern} entries that matched textually but were
+    # suppressed because they looked like a third-party mention --
+    # kept only for transparency/debugging, never used in scoring.
     # =============================================================
 
     def detect_risk_patterns(self, text):
         normalized_text = text.lower()
+        sentences = self._split_sentences(normalized_text)
+
         detected = {}
+        third_party = []
 
         for category, patterns in self.RISK_PATTERNS.items():
             matches = []
 
-            for pattern in patterns:
-                if re.search(pattern, normalized_text, flags=re.IGNORECASE):
-                    matches.append(pattern)
+            for sentence in sentences:
+                third_party_sentence = self._is_third_party(sentence)
+
+                for pattern in patterns:
+                    for match in re.finditer(pattern, sentence, flags=re.IGNORECASE):
+                        if self._is_negated(sentence, match.start()):
+                            continue
+
+                        if third_party_sentence:
+                            third_party.append({
+                                "category": category,
+                                "pattern": pattern,
+                            })
+                            continue
+
+                        matches.append(pattern)
 
             if matches:
                 detected[category] = matches
 
-        return detected
+        return detected, third_party
 
     # =============================================================
     # PROTECTIVE SIGNALS (UNCHANGED)
@@ -957,7 +910,7 @@ class MentalHealthPredictor:
         return min(score, 1.0)
 
     # =============================================================
-    # TEXT RISK SCORE (UNCHANGED)
+    # TEXT RISK SCORE (UNCHANGED -- still driven by risk_config.json)
     # =============================================================
 
     def calculate_text_risk_score(self, detected_patterns):
@@ -1003,11 +956,16 @@ class MentalHealthPredictor:
         return "low"
 
     # =============================================================
-    # COMPLETE RISK ASSESSMENT (UNCHANGED)
+    # COMPLETE RISK ASSESSMENT
+    # -------------------------------------------------------------
+    # Risk remains a fully separate analysis layer from emotion --
+    # it is never derived by simply equating an emotion label with
+    # elevated risk. This is a HEURISTIC SCREENING signal only, not
+    # a clinical assessment, and must be presented to users as such.
     # =============================================================
 
     def calculate_risk_assessment(self, probabilities, text):
-        detected_patterns = self.detect_risk_patterns(text)
+        detected_patterns, third_party_mentions = self.detect_risk_patterns(text)
         protective_patterns = self.detect_protective_patterns(text)
 
         emotion_score = self.calculate_emotion_risk(probabilities)
@@ -1018,24 +976,6 @@ class MentalHealthPredictor:
         text_score, text_category_scores = self.calculate_text_risk_score(
             detected_patterns
         )
-
-        # ---------------------------------------------------------
-        # MODERATE EMOTIONAL DISTRESS SIGNAL
-        # ---------------------------------------------------------
-        fear_score = probabilities.get("fear", 0.0)
-        nervousness_score = probabilities.get("nervousness", 0.0)
-
-        moderate_distress_score = max(
-            fear_score,
-            nervousness_score
-        )
-
-        # Only treat substantial fear/nervousness as a
-        # moderate-distress signal. This does NOT represent
-        # a clinical assessment.
-        if moderate_distress_score >= 0.50:
-            text_score = max(text_score, 0.40)
-            text_category_scores["moderate_emotional_distress"] = 0.40
 
         weights = self.risk_config.get("risk_weights", {})
 
@@ -1065,45 +1005,78 @@ class MentalHealthPredictor:
             "text_risk_category_scores": text_category_scores,
             "protective_text_signals": len(protective_patterns),
             "risk_patterns": detected_patterns,
+            # Transparency-only field: text that matched a risk phrase
+            # but was suppressed from scoring because it looked like
+            # it was describing someone else (see _is_third_party).
+            # Never surfaced in the UI, kept for debugging/audit.
+            "third_party_mentions": third_party_mentions,
+            # Explicit, stable disclaimer field so any consumer of
+            # this object (Node, frontend, logs) can quote it directly
+            # instead of re-writing disclaimer copy in multiple places.
+            "disclaimer": (
+                "Heuristic screening indicator. Not a clinical "
+                "assessment or diagnosis."
+            ),
         }
 
     # =============================================================
     # DIAGNOSTIC LOGGING
     # =============================================================
 
-    def _log_emotion_decision(self, text, final_emotion):
-        """
-        Temporary-style diagnostic logging (kept permanently, since
-        it is cheap and directly answers "why did the app pick this
-        emotion?" for any input, not just "i am ok"). Prints the
-        primary prediction, its confidence/margin, the GoEmotions
-        top labels considered, and the final decision + reason.
-        """
-        top_goemotions = final_emotion.get("top_goemotions_emotions")
+    def _log_emotion_decision(self, text, dominant, secondary):
+        secondary_display = [
+            f"{item['label']}={round(item['probability'], 4)}"
+            for item in secondary
+        ]
+
+        probability_display = (
+            round(dominant["probability"], 4)
+            if dominant["probability"] is not None
+            else None
+        )
 
         print(f"\n--- Emotion decision for: {text!r} ---")
         print(
-            "Primary model prediction:", final_emotion["primary_model_prediction"],
-            "| confidence:", round(final_emotion["primary_model_confidence"], 4),
-            "| margin:", round(final_emotion["primary_model_margin"], 4),
-            "| low_confidence:", final_emotion["primary_model_was_low_confidence"],
-            "| ambiguous:", final_emotion["primary_model_was_ambiguous"],
+            "Dominant:", dominant["label"],
+            "| probability:", probability_display,
+            "| source:", dominant["source"],
         )
+        print("Secondary:", secondary_display if secondary_display else "(none)")
+        print("---------------------------------------------\n")
+
+    def _log_aggregation_decision(self, meta):
+        """
+        Debug-only logging for the long-entry aggregation path --
+        mirrors the style of _log_emotion_decision/_log_risk_decision
+        so it's easy to see, during development, whether an entry
+        was treated as long, how many chunks it produced, and what
+        each chunk's own top emotion was before aggregation.
+        """
+        if not meta.get("is_long_entry"):
+            print("--- Emotion aggregation: entry treated as SHORT (single pass) ---\n")
+            return
+
+        print(f"\n--- Emotion aggregation: entry treated as LONG ({meta['chunk_count']} chunks) ---")
+        for i, chunk in enumerate(meta.get("chunks") or [], start=1):
+            preview = chunk["text"][:60] + ("..." if len(chunk["text"]) > 60 else "")
+            print(f"  chunk {i}: top={chunk['top_label']} ({chunk['top_score']}) | {preview!r}")
+        print("---------------------------------------------\n")
+
+    def _log_risk_decision(self, text, risk):
+        """
+        Lightweight diagnostic logging for the risk pipeline --
+        mirrors _log_emotion_decision so "why did this get flagged?"
+        is just as answerable for risk as it is for emotion.
+        """
+        print(f"\n--- Risk decision for: {text!r} ---")
         print(
-            "Six-class GoEmotions coverage:",
-            round(final_emotion["six_class_coverage"], 4),
-            f"(threshold {self.SIX_CLASS_COVERAGE_THRESHOLD})",
-            "| support for primary's pick:",
-            round(final_emotion["primary_category_support"], 4),
-            f"(threshold {self.PRIMARY_COROBORATION_THRESHOLD})",
+            "Level:", risk["risk_level"],
+            "| score:", round(risk["risk_score"], 4),
+            "| categories:", risk["detected_risk_categories"],
+            "| protective_signals:", risk["protective_text_signals"],
         )
-        if top_goemotions:
-            print("GoEmotions top mapped categories:", top_goemotions)
-        print(
-            "FINAL EMOTION:", final_emotion["emotion"],
-            "| source:", final_emotion["source"],
-            "| fallback_reason:", final_emotion["fallback_reason"],
-        )
+        if risk["third_party_mentions"]:
+            print("Suppressed third-party mentions:", risk["third_party_mentions"])
         print("---------------------------------------------\n")
 
     # =============================================================
@@ -1120,87 +1093,110 @@ class MentalHealthPredictor:
             raise ValueError("text cannot be empty")
 
         # ---------------------------------------------------------
-        # MODEL 1 — PRIMARY EMOTION
+        # GOEMOTIONS -- single raw pass over the full entry text.
+        # This is EXACTLY the same call/behavior that existed before
+        # the long-entry aggregation change, and continues to be
+        # what powers SENTIMENT and RISK below unchanged.
         # ---------------------------------------------------------
-        primary_emotion = self.predict_primary_emotion(text)
+        raw_probabilities = self.predict_goemotions(text)
 
         # ---------------------------------------------------------
-        # MODEL 2 — GOEMOTIONS
-        # ---------------------------------------------------------
-        goemotions_probabilities = self.predict_goemotions(text)
-
-        active_emotions = self.get_active_emotions(goemotions_probabilities)
-        sentiment = self.calculate_sentiment(goemotions_probabilities)
-        risk = self.calculate_risk_assessment(goemotions_probabilities, text)
-        print("\n========== RISK ASSESSMENT ==========")
-        print("Risk score:", round(risk["risk_score"], 4))
-        print("Risk level:", risk["risk_level"])
-        print("Emotion component:", round(risk["emotion_component"], 4))
-        print("Text component:", round(risk["text_component"], 4))
-        print("Protective emotion component:", round(risk["protective_emotion_component"], 4))
-        print("Detected risk categories:", risk["detected_risk_categories"])
-        print("Text risk category scores:", risk["text_risk_category_scores"])
-        print("Protective text signals:", risk["protective_text_signals"])
-        print("=====================================\n")
-
-        # ---------------------------------------------------------
-        # FINAL EMOTION SELECTION
+        # EMOTION RESOLUTION -- long-entry aware.
         #
-        # See select_final_emotion() docstring / class docstring for
-        # the full rationale. In short: the primary model's pick is
-        # trusted only when GoEmotions independently corroborates
-        # it; otherwise GoEmotions decides (or, if GoEmotions itself
-        # doesn't clearly support any of the six categories, the
-        # result is the "neutral" sentinel).
+        # Short entries (< LONG_ENTRY_WORD_THRESHOLD words) reuse
+        # raw_probabilities directly -- no extra model calls, same
+        # dominant/secondary resolution as before this change.
+        #
+        # Longer entries are segmented into sentence-aware chunks,
+        # each chunk analyzed with the SAME predict_goemotions(),
+        # then aggregated (aggregate_chunk_probabilities()) into one
+        # probability profile BEFORE dominant/secondary resolution,
+        # so a long entry isn't reduced to whichever single emotion
+        # happened to score highest overall.
         # ---------------------------------------------------------
-        final_emotion = self.select_final_emotion(
-            primary_emotion, goemotions_probabilities
+        emotion_probabilities, aggregation_meta = self.predict_goemotions_aggregated(
+            text, raw_probabilities
         )
-        print("\n========== FINAL PYTHON RESULT ==========")
-        print("TEXT:", text)
-        print("PRIMARY:", primary_emotion["emotion"])
-        print("PRIMARY CONFIDENCE:", primary_emotion["confidence"])
-        print("GOEMOTIONS APPROVAL:", goemotions_probabilities.get("approval"))
-        print("GOEMOTIONS NEUTRAL:", goemotions_probabilities.get("neutral"))
-        print("GOEMOTIONS OPTIMISM:", goemotions_probabilities.get("optimism"))
-        print("GOEMOTIONS CARING:", goemotions_probabilities.get("caring"))
-        print("FINAL EMOTION:", final_emotion["emotion"])
-        print("FINAL CONFIDENCE:", final_emotion["confidence"])
-        print("FINAL SOURCE:", final_emotion["source"])
-        print("FALLBACK REASON:", final_emotion["fallback_reason"])
-        print("==========================================\n")
-        self._log_emotion_decision(text, final_emotion)
+
+        dominant_emotion, secondary_emotions = (
+            self.get_dominant_and_secondary_emotions(emotion_probabilities)
+        )
+        active_emotions = self.get_active_emotions(emotion_probabilities)
+
+        # ---------------------------------------------------------
+        # SENTIMENT -- separate analysis layer, UNCHANGED: still
+        # derived from the single raw pass, exactly as before.
+        # ---------------------------------------------------------
+        sentiment = self.calculate_sentiment(raw_probabilities)
+
+        # ---------------------------------------------------------
+        # RISK -- separate screening layer, UNCHANGED. Still
+        # computed from raw_probabilities + the full original text,
+        # never from the aggregated long-entry emotion profile. This
+        # is the field Node/React must surface.
+        # ---------------------------------------------------------
+        risk = self.calculate_risk_assessment(raw_probabilities, text)
+
+        # ---------------------------------------------------------
+        # OVERALL REFLECTION -- short, deterministic, template-based
+        # 2-3 line summary built only from the dominant/secondary
+        # emotions actually detected above. See
+        # generate_emotional_reflection() docstring.
+        # ---------------------------------------------------------
+        reflection_summary = self.generate_emotional_reflection(
+            dominant_emotion, secondary_emotions
+        )
+
+        self._log_emotion_decision(text, dominant_emotion, secondary_emotions)
+        self._log_aggregation_decision(aggregation_meta)
+        self._log_risk_decision(text, risk)
 
         # ---------------------------------------------------------
         # FINAL RESULT
         # ---------------------------------------------------------
         return {
             "text": text,
-            "emotion": final_emotion,
-            "sentiment": sentiment,
-            "goemotions": {
-                "active_emotions": active_emotions,
-                "probabilities": goemotions_probabilities,
+            "emotion": {
+                "label": dominant_emotion["label"],
+                "probability": dominant_emotion["probability"],
+                "source": dominant_emotion["source"],
             },
+            "goemotions": {
+                "dominant_emotion": {
+                    "label": dominant_emotion["label"],
+                    "probability": dominant_emotion["probability"],
+                },
+                "secondary_emotions": secondary_emotions,
+                "probabilities": emotion_probabilities,
+                "raw_probabilities": raw_probabilities,
+                "active_emotions": active_emotions,
+                "is_long_entry": aggregation_meta["is_long_entry"],
+                "chunk_count": aggregation_meta["chunk_count"],
+            },
+            "sentiment": sentiment,
             "risk": risk,
+            "reflection": {
+                "summary": reflection_summary,
+            },
         }
 
 
 if __name__ == "__main__":
-    # Manual verification entry point (requirement #16): running this
-    # file directly loads both real trained models and prints the
-    # full before/after-style decision trace for "i am ok", plus a
-    # couple of comparison sentences. This requires the actual model
-    # directories under base_dir/models/ to be present -- it is NOT
-    # part of the automated test suite (see
-    # test_predictor_emotion_selection.py for that, which does not
-    # require the model weights).
     predictor = MentalHealthPredictor()
 
-    for sample_text in [
-        "i am ok",
-        "I'm absolutely thrilled and overjoyed today!",
-        "I feel so hopeless and sad, nothing is going right.",
-    ]:
+    test_sentences = [
+        "I had a great day and I'm excited about tomorrow.",
+        "I am nervous about my exam.",
+        "I feel hopeless and trapped.",
+        "I don't want to live anymore.",
+        "I want to hurt myself.",
+        "I am not suicidal and I don't want to hurt myself.",
+        "I passed my exam and I'm happy, but I'm also nervous about what comes next.",
+        "I went to college today.",
+        "My friend said he wanted to die.",
+    ]
+
+    for sample_text in test_sentences:
         result = predictor.analyze(sample_text)
         print(json.dumps(result["emotion"], indent=2, default=str))
+        print(json.dumps(result["risk"], indent=2, default=str))

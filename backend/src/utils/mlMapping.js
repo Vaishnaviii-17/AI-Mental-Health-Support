@@ -4,146 +4,173 @@
  * Helpers for mapping trained-model output onto the existing
  * journal/mood database schema.
  *
- * -----------------------------------------------------------------
+ * ---------------------------------------------------------------
  * EMOTION RESOLUTION AUTHORITY
- * -----------------------------------------------------------------
+ * ---------------------------------------------------------------
+ * GoEmotions is the SOLE source of emotion detection (see
+ * predictor.py). Python already resolves the dominant emotion and
+ * secondary/supporting emotions directly from raw GoEmotions
+ * probabilities -- this file does NOT re-run that decision, it
+ * only reads it.
  *
- * The primary-vs-GoEmotions ambiguity decision (confidence < 0.60
- * OR margin < 0.15) and the GoEmotions -> six-class fallback
- * mapping are decided EXACTLY ONCE, in predictor.py
- * (PRIMARY_CONFIDENCE_THRESHOLD, PRIMARY_MARGIN_THRESHOLD, and
- * GOEMOTIONS_TO_SIX_MAP).
- *
- * This file does NOT re-evaluate ambiguity and does NOT maintain
- * its own GoEmotions -> six-class mapping. It only reads the
- * final decision Python already made, available at:
- *
- *   analysis.emotion.emotion      -> one of the six supported
- *                                     labels, always
- *   analysis.emotion.confidence   -> confidence of whichever
- *                                     source was used
- *   analysis.emotion.source       -> "primary_model" or
- *                                     "goemotions_fallback"
- *   analysis.emotion.fallback_reason (present only when source is
- *                                     "goemotions_fallback")
- *
- * Previously this file duplicated that decision (with a *different*
- * margin threshold, 0.10, and a second, separately-maintained
- * GoEmotions map) which meant the DB-stored emotion, the emotion
- * printed in Python's own logs, and the emotion in the API
- * response could all disagree. That duplication has been removed.
+ * ---------------------------------------------------------------
+ * RISK RESOLUTION AUTHORITY
+ * ---------------------------------------------------------------
+ * Risk screening is calculated ENTIRELY in Python
+ * (calculate_risk_assessment() in predictor.py) and is a heuristic
+ * SCREENING indicator, never a clinical assessment. This file does
+ * NOT recompute, re-weight, or duplicate that logic -- resolveRisk()
+ * below only reads analysis.risk and fills in safe defaults so the
+ * rest of the app doesn't have to null-check it everywhere.
  *
  * This is NOT a clinical assessment.
  */
 
+// Display emoji for GoEmotions' native labels (28 fine-grained
+// labels + neutral). This is a UI presentation concern only.
 const EMOTION_EMOJI_MAP = {
-  sadness: "😢",
+  admiration: "🤩",
+  amusement: "😄",
+  anger: "😠",
+  annoyance: "😒",
+  approval: "👍",
+  caring: "🥰",
+  confusion: "😕",
+  curiosity: "🤔",
+  desire: "😍",
+  disappointment: "😞",
+  disapproval: "👎",
+  disgust: "🤢",
+  embarrassment: "😳",
+  excitement: "🤗",
+  fear: "😨",
+  gratitude: "🙏",
+  grief: "💔",
   joy: "😄",
   love: "🥰",
-  anger: "😠",
-  fear: "😨",
+  nervousness: "😬",
+  optimism: "🌤️",
+  pride: "😌",
+  realization: "💡",
+  relief: "😮‍💨",
+  remorse: "😔",
+  sadness: "😢",
   surprise: "😲",
+  neutral: "😐",
 };
 
-// The six-class schema the database/frontend already expect.
-// Used only as a validity guard on Python's output -- NOT as a
-// second mapping table. If predictor.py ever returns something
-// outside this set, we fail safe (null) rather than silently
-// storing an arbitrary GoEmotions label like "approval" or
-// "neutral" into the existing `emotion` column.
-const SUPPORTED_EMOTIONS = new Set(
-  Object.keys(EMOTION_EMOJI_MAP)
-);
+const DEFAULT_EMOTION_EMOJI = "🙂";
 
-
-/**
- * Convert emotion → emoji.
- */
 function emotionToEmoji(emotion) {
   if (!emotion) return null;
-
-  return EMOTION_EMOJI_MAP[emotion] || null;
+  return EMOTION_EMOJI_MAP[emotion] || DEFAULT_EMOTION_EMOJI;
 }
-
 
 /**
  * Resolve the final application emotion.
  *
- * Python (predictor.py) has already decided the final emotion --
- * whether it came straight from the confident primary model or
- * from the mapped GoEmotions fallback -- and already guarantees
- * `analysis.emotion.emotion` is one of the six supported labels.
- * This function's job is just to read that decision safely, not
- * to recompute it.
- *
- * Returns:
- *
- * {
- *   emotion,             // one of the six labels, or null
- *   source,              // "primary_model" | "goemotions_fallback" | null
- *   confidence,          // confidence of whichever source was used
- *   primaryEmotion,      // what the primary 6-class model predicted
- *   primaryConfidence,   // primary model's own confidence
- *   fallbackReason,      // e.g. "ambiguous_margin", null if no fallback
- *   fallbackWasAmbiguous // true if even the GoEmotions fallback was weak
- * }
+ * Python (predictor.py) has already decided the dominant emotion
+ * and its secondary/supporting emotions directly from GoEmotions.
+ * This function's job is just to read that decision safely.
  */
 function resolveEmotion(analysis) {
-  const rawEmotion = analysis?.emotion?.emotion || null;
+  const emotion = analysis?.emotion?.label || null;
 
   const source = analysis?.emotion?.source || null;
 
-  const confidence = Number(analysis?.emotion?.confidence);
+  const rawProbability = analysis?.emotion?.probability;
+  const probability =
+    rawProbability === null || rawProbability === undefined
+      ? null
+      : Number(rawProbability);
 
-  const primaryEmotion =
-    analysis?.emotion?.primary_model_prediction ?? rawEmotion;
-
-  const primaryConfidence = Number(
-    analysis?.emotion?.primary_model_confidence
-  );
-
-  const fallbackReason =
-    source === "goemotions_fallback"
-      ? analysis?.emotion?.fallback_reason || null
-      : null;
-
-  const fallbackWasAmbiguous =
-    source === "goemotions_fallback"
-      ? Boolean(analysis?.emotion?.fallback_was_ambiguous)
-      : false;
-
-  // Safety net, not a second mapping: Python guarantees this is
-  // always one of the six labels. If that contract is ever
-  // violated (bad upstream response, stale server, etc.) we do
-  // not want to store an out-of-schema value.
-  const emotion = SUPPORTED_EMOTIONS.has(rawEmotion)
-    ? rawEmotion
-    : null;
-
-  if (rawEmotion && !emotion) {
-    console.error(
-      "mlMapping: predictor returned an out-of-schema emotion, " +
-        "dropping it instead of storing it:",
-      rawEmotion
-    );
-  }
+  const secondaryEmotions = Array.isArray(
+    analysis?.goemotions?.secondary_emotions
+  )
+    ? analysis.goemotions.secondary_emotions
+    : [];
 
   return {
     emotion,
+    probability: Number.isFinite(probability) ? probability : null,
     source,
-    confidence: Number.isFinite(confidence) ? confidence : null,
-    primaryEmotion,
-    primaryConfidence: Number.isFinite(primaryConfidence)
-      ? primaryConfidence
-      : null,
-    fallbackReason,
-    fallbackWasAmbiguous,
+    secondaryEmotions,
   };
 }
 
+/**
+ * Human-readable labels for risk categories returned by
+ * predictor.py's RISK_PATTERNS. Used so the UI never has to show
+ * a raw category key or, worse, a regex pattern to the user.
+ */
+const RISK_CATEGORY_LABELS = {
+  suicidal_ideation: "Thoughts of not wanting to live",
+  self_harm: "Self-harm related language",
+  hopelessness: "Hopelessness",
+  feeling_trapped: "Feeling trapped",
+  severe_distress: "Severe distress",
+};
+
+function riskCategoryLabel(category) {
+  return RISK_CATEGORY_LABELS[category] || category;
+}
 
 /**
- * Convert sentiment into the existing 1–5 journal score.
+ * Resolve the risk screening result for display/persistence.
+ *
+ * Risk is calculated ENTIRELY by Python (see predictor.py /
+ * calculate_risk_assessment()). This function only reads
+ * analysis.risk and returns a safe, fully-defaulted shape -- it
+ * never recomputes risk_score/risk_level itself.
+ *
+ * Returns:
+ * {
+ *   riskScore,          // number 0-1, or null if unavailable
+ *   riskLevel,          // "low" | "elevated" | "high" | "critical" | null
+ *   detectedCategories, // [{ key, label }, ...]
+ *   protectiveSignals,  // number
+ *   raw,                // the original analysis.risk object, or null
+ * }
+ */
+function resolveRisk(analysis) {
+  const risk = analysis?.risk || null;
+
+  if (!risk) {
+    return {
+      riskScore: null,
+      riskLevel: null,
+      detectedCategories: [],
+      protectiveSignals: 0,
+      raw: null,
+    };
+  }
+
+  const rawScore = risk.risk_score;
+  const riskScore =
+    rawScore === null || rawScore === undefined ? null : Number(rawScore);
+
+  const detectedCategories = Array.isArray(risk.detected_risk_categories)
+    ? risk.detected_risk_categories.map((key) => ({
+        key,
+        label: riskCategoryLabel(key),
+      }))
+    : [];
+
+  return {
+    riskScore: Number.isFinite(riskScore) ? riskScore : null,
+    riskLevel: risk.risk_level || null,
+    detectedCategories,
+    protectiveSignals: Number(risk.protective_text_signals) || 0,
+    raw: risk,
+  };
+}
+
+/**
+ * Convert sentiment into the existing 1-5 journal score.
+ *
+ * Sentiment remains a separate signal from emotion and from risk --
+ * derived from GoEmotions' own positive/negative/neutral emotion
+ * groupings (see calculate_sentiment in predictor.py).
  */
 function sentimentToScore(scores) {
   if (!scores) return null;
@@ -165,53 +192,91 @@ function sentimentToScore(scores) {
   return 3;
 }
 
-
 /**
- * Build automated journal summary.
+ * Build the natural-language journal reflection/insight text that
+ * gets persisted and shown in the "Reflection" line of the AI Mood
+ * Reflection panel.
  *
- * Wording explicitly reflects whether the final emotion came
- * straight from the primary model or from the GoEmotions
- * fallback, instead of always claiming a "primary emotion" was
- * detected.
+ * ---------------------------------------------------------------
+ * REFLECTION AUTHORITY
+ * ---------------------------------------------------------------
+ * As of the long-entry emotion aggregation change, predictor.py
+ * already generates a short, deterministic, template-based 2-3
+ * line reflection from the actual detected dominant/secondary
+ * emotions (see generate_emotional_reflection() in predictor.py --
+ * this is what correctly reflects long, multi-emotion entries
+ * instead of collapsing them to one dominant label). This function
+ * just reads analysis.reflection.summary, the same way
+ * resolveEmotion()/resolveRisk() only read Python's decisions
+ * rather than recomputing them.
+ *
+ * A defensive fallback (the previous robotic "Automated summary:
+ * ..." sentence) is kept for the unlikely case an older inference
+ * server response doesn't include `reflection` yet, so this never
+ * throws and old/in-flight responses don't break the UI.
+ *
+ * Risk mentions (when not low) are appended as before, worded as a
+ * heuristic screening indicator, never a diagnosis. The Risk
+ * Screening panel itself remains the primary place risk is shown --
+ * this is just a one-line pointer within the emotion reflection.
  */
 function buildJournalSummary(analysis) {
-  const resolved = resolveEmotion(analysis);
+  const risk = resolveRisk(analysis);
 
-  const emotion = resolved.emotion || "unknown";
+  const generatedReflection =
+    typeof analysis?.reflection?.summary === "string" &&
+    analysis.reflection.summary.trim()
+      ? analysis.reflection.summary.trim()
+      : null;
 
-  const sentimentLabel =
-    analysis?.sentiment?.label || "neutral";
+  let summary = generatedReflection || legacyEmotionSummary(analysis);
 
-  const riskLevel =
-    analysis?.risk?.risk_level || "low";
-
-  let summary = `Automated summary: emotion detected as "${emotion}"`;
-
-  if (resolved.source === "goemotions_fallback") {
+  if (risk.riskLevel && risk.riskLevel !== "low") {
     summary +=
-      " (the primary model's prediction was ambiguous, so this" +
-      " was resolved using GoEmotions as a fallback signal)";
-  } else if (resolved.confidence !== null) {
-    const confidencePct = Math.round(resolved.confidence * 100);
-    summary += ` (${confidencePct}% model confidence)`;
-  }
-
-  summary += `, overall tone ${sentimentLabel}.`;
-
-  if (riskLevel !== "low") {
-    summary +=
-      ` Engineering risk screening flagged this entry as "${riskLevel}" risk.` +
+      ` Risk screening flagged this entry as "${risk.riskLevel}".` +
       ` This is a heuristic screening indicator, not a clinical assessment.`;
   }
 
   return summary;
 }
 
+/**
+ * Fallback only -- used if analysis.reflection.summary is ever
+ * missing (e.g. an older inference server response). Not used in
+ * the normal path once predictor.py returns `reflection`.
+ */
+function legacyEmotionSummary(analysis) {
+  const resolved = resolveEmotion(analysis);
+  const emotion = resolved.emotion || "neutral";
+  const sentimentLabel = analysis?.sentiment?.label || "neutral";
+
+  let summary = `Automated summary: dominant emotion detected as "${emotion}"`;
+
+  if (resolved.probability !== null) {
+    const scorePct = Math.round(resolved.probability * 100);
+    summary += ` (${scorePct}% model score)`;
+  }
+
+  if (resolved.secondaryEmotions.length > 0) {
+    const secondaryList = resolved.secondaryEmotions
+      .map((item) => item.label)
+      .join(", ");
+    summary += `, with supporting signals of ${secondaryList}`;
+  }
+
+  summary += `, overall tone ${sentimentLabel}.`;
+
+  return summary;
+}
 
 module.exports = {
   EMOTION_EMOJI_MAP,
+  DEFAULT_EMOTION_EMOJI,
+  RISK_CATEGORY_LABELS,
   emotionToEmoji,
+  riskCategoryLabel,
   sentimentToScore,
   buildJournalSummary,
   resolveEmotion,
+  resolveRisk,
 };
