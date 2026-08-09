@@ -31,6 +31,24 @@ async function getMoodHistory(userId) {
 }
 
 /**
+ * Get today's mood check-ins for a user (server-local calendar day),
+ * OLDEST first, so callers can treat the last element as "latest".
+ * Used by moodAnalysisService to build today's combined analysis.
+ */
+async function getTodayMoods(userId) {
+  const query = `
+    SELECT *
+    FROM moods
+    WHERE user_id = $1
+      AND created_at::date = CURRENT_DATE
+    ORDER BY created_at ASC;
+  `;
+
+  const { rows } = await pool.query(query, [userId]);
+  return rows;
+}
+
+/**
  * Calculate aggregate mood analytics for a user
  */
 async function getMoodStats(userId) {
@@ -174,6 +192,7 @@ async function getActivityCalendar(userId) {
 module.exports = {
   createMood,
   getMoodHistory,
+  getTodayMoods,
   getMoodStats,
   getActivityCalendar,
 };

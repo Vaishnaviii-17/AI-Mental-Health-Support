@@ -436,7 +436,11 @@ function JournalPage() {
                 <p className="journal-modal-content">{activeJournal.content}</p>
               </div>
 
-              {(activeJournal.emotion || activeJournal.sentiment_score || activeJournal.insight) && (
+              {(activeJournal.emotion ||
+                (activeJournal.sentiment_score !== null &&
+                  activeJournal.sentiment_score !== undefined) ||
+                  activeJournal.risk_level ||
+                activeJournal.insight) && (
                 <footer className="journal-modal-footer">
                   <div className="journal-analysis-header">
                     <Smile size={14} />
@@ -449,12 +453,24 @@ function JournalPage() {
                         <strong>{activeJournal.emotion}</strong>
                       </div>
                     )}
-                    {activeJournal.sentiment_score && (
-                      <div className="analysis-item">
-                        <span>Wellness Score</span>
-                        <strong>{activeJournal.sentiment_score} / 5</strong>
-                      </div>
-                    )}
+                    {activeJournal.sentiment_score !== null &&
+                      activeJournal.sentiment_score !== undefined && (
+                        <div className="analysis-item">
+                          <span>Wellness Score</span>
+                          <strong>{activeJournal.sentiment_score} / 5</strong>
+                        </div>
+                      )}
+                      {activeJournal.risk_level && (
+                        <div className="analysis-item">
+                          <span>Risk Indication</span>
+                          <strong>
+                            {activeJournal.risk_level === "low" && "🟢 Low"}
+                            {activeJournal.risk_level === "elevated" && "🟠 Moderate"}
+                            {activeJournal.risk_level === "high" && "🔴 High"}
+                            {activeJournal.risk_level === "critical" && "🔴 High"}
+                          </strong>
+                        </div>
+                      )}
                   </div>
                   {activeJournal.insight && (
                     <div className="journal-analysis-insight">
