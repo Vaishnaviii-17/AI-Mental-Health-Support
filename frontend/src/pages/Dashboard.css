@@ -772,3 +772,21 @@
     font-weight:600;
     color:var(--text-primary);
 }
+
+.dashboard {
+  transition: filter 0.25s ease;
+}
+
+.dashboard--blur {
+  filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+body.modal-open {
+  overflow: hidden;
+}
+.dashboard {
+  will-change: filter;
+  position: relative;
+  z-index: 1;
+}

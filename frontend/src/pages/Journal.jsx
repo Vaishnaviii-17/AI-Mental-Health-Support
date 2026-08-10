@@ -81,7 +81,7 @@ function JournalPage() {
 
   // Form states
   const [form, setForm] = useState({ title: "", content: "" });
-
+  
   // Search, Filter & Sort states
   const [searchText, setSearchText] = useState("");
   const [emotionFilter, setEmotionFilter] = useState("All");
@@ -369,8 +369,7 @@ function JournalPage() {
                     }}
                     className="search-input"
                   />
-                </div>
-
+                </div>          
                 <div className="controls-dropdowns-row">
                   <div className="filter-select-group">
                     <Filter size={12} className="control-icon" />
@@ -425,77 +424,55 @@ function JournalPage() {
                 </div>
               ) : (
                 <div className="journals-list-grid">
-                  {paginatedJournals.map((journal, index) => {
-                    // Compact risk screening indicator, shown for every
-                    // level (including Low) so the card always reflects
-                    // that entry's actual result -- reusing the SAME
-                    // risk_analysis data already returned with each
-                    // journal row, never recalculated here. Old/legacy
-                    // rows without risk_analysis simply render nothing.
-                    const cardRiskLevel = journal?.risk_analysis?.risk_level || null;
-                    const cardRiskDisplay = cardRiskLevel
-                      ? RISK_LEVEL_DISPLAY[cardRiskLevel] || { label: cardRiskLevel, tone: cardRiskLevel }
-                      : null;
-
-                    return (
-                      <motion.article
-                        key={journal.id}
-                        className="dashboard-card journal-card-item"
-                        initial={{ opacity: 0, y: 8 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2, delay: index * 0.03 }}
-                        onClick={() => setActiveJournal(journal)}
-                      >
-                        <div className="journal-card-header">
-                          <div className="journal-card-title-group">
-                            <span className="journal-card-emoji" role="img" aria-label="mood">
-                              {journal.mood || "📝"}
-                            </span>
-                            <div className="journal-card-header-text">
-                              <h3>{journal.title}</h3>
-                              <time className="journal-card-time">
-                                <Calendar size={10} />
-                                {formatDate(journal.created_at)}
-                              </time>
-                            </div>
+                  {paginatedJournals.map((journal, index) => (
+                    <motion.article
+                      key={journal.id}
+                      className="dashboard-card journal-card-item"
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.03 }}
+                      onClick={() => setActiveJournal(journal)}
+                    >
+                      <div className="journal-card-header">
+                        <div className="journal-card-title-group">
+                          <span className="journal-card-emoji" role="img" aria-label="mood">
+                            {journal.mood || "📝"}
+                          </span>
+                          <div className="journal-card-header-text">
+                            <h3>{journal.title}</h3>
+                            <time className="journal-card-time">
+                              <Calendar size={10} />
+                              {formatDate(journal.created_at)}
+                            </time>
                           </div>
-                          <button
-                            type="button"
-                            className="journal-delete-btn"
-                            onClick={(e) => handleDelete(journal.id, e)}
-                            aria-label="Delete journal entry"
-                          >
-                            <Trash2 size={14} />
-                          </button>
                         </div>
+                        <button
+                          type="button"
+                          className="journal-delete-btn"
+                          onClick={(e) => handleDelete(journal.id, e)}
+                          aria-label="Delete journal entry"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
 
-                        {/* Truncated preview limited to 100 characters */}
-                        <p className="journal-card-preview">
-                          {journal.content.length > 100
-                            ? `${journal.content.slice(0, 100)}...`
-                            : journal.content}
-                        </p>
+                      {/* Truncated preview limited to 100 characters */}
+                      <p className="journal-card-preview">
+                        {journal.content.length > 100
+                          ? `${journal.content.slice(0, 100)}...`
+                          : journal.content}
+                      </p>
 
-                        <div className="journal-card-footer">
-                          <span className="journal-emotion-badge">
-                            {displayEmotionLabel(journal.emotion)}
-                          </span>
-                          {cardRiskDisplay && (
-                            <span
-                              className={`journal-risk-badge journal-risk-badge--${cardRiskLevel}`}
-                              title="Heuristic screening indicator, not a clinical assessment"
-                            >
-                              <ShieldAlert size={11} />
-                              Risk: {cardRiskDisplay.label}
-                            </span>
-                          )}
-                          <span className="journal-read-link">
-                            View &rarr;
-                          </span>
-                        </div>
-                      </motion.article>
-                    );
-                  })}
+                      <div className="journal-card-footer">
+                        <span className="journal-emotion-badge">
+                          {journal.emotion || "Neutral"}
+                        </span>
+                        <span className="journal-read-link">
+                          View &rarr;
+                        </span>
+                      </div>
+                    </motion.article>
+                  ))}
                 </div>
               )}
 
@@ -609,6 +586,17 @@ function JournalPage() {
                     )}
                   </div>
 
+                        <span>Emotion</span>
+                        <strong>{activeJournal.emotion}</strong>
+                      </div>
+                    )}
+                    {activeJournal.sentiment_score && (
+                      <div className="analysis-item">
+                        <span>Wellness Score</span>
+                        <strong>{activeJournal.sentiment_score} / 5</strong>
+                      </div>
+                    )}
+                  </div>
                   {activeJournal.insight && (
                     <div className="journal-analysis-insight">
                       <p><strong>Reflection:</strong> {activeJournal.insight}</p>

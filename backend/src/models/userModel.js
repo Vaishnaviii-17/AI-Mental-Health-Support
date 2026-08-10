@@ -34,7 +34,6 @@ async function findByUsername(username) {
 
 /**
  * Find user by ID
- *
  * Anonymous-user system:
  * We only retrieve fields that exist in the users table.
  */
@@ -69,7 +68,6 @@ async function updatePassword(id, hashedPassword) {
 
 /**
  * Update user profile
- *
  * Anonymous-user system:
  * Only username is editable.
  */

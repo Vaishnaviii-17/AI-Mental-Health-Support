@@ -535,6 +535,7 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
 /* --------------------------------------------------------------
    Risk screening UI additions -- append to the existing Journal.css.
    The original file wasn't included in the provided project material,
@@ -651,7 +652,6 @@
    categories" in the risk panel, so this fixes both instances of
    the same unstyled-label bug.
    -------------------------------------------------------------- */
-
 .journal-analysis-secondary {
   margin-top: 10px;
 }

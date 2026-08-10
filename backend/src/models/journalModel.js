@@ -63,6 +63,51 @@ async function createJournal(
     JSON.stringify(riskAnalysis || {}),
     insight,
   ];
+    
+/**
+ * Create a new journal entry
+ */
+async function createJournal(
+  userId,
+  {
+    title,
+    content,
+    mood,
+    emotion,
+    secondaryEmotions,
+    sentimentScore,
+    riskAnalysis,
+    insight,
+  }
+) {
+  const query = `
+    INSERT INTO journals (
+      user_id,
+      title,
+      content,
+      mood,
+      emotion,
+      secondary_emotions,
+      sentiment_score,
+      risk_analysis,
+      insight
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    RETURNING *;
+  `;
+
+  const values = [
+    userId,
+    title,
+    content,
+    mood,
+    emotion,
+    JSON.stringify(secondaryEmotions || []),
+    sentimentScore,
+    riskAnalysis ? JSON.stringify(riskAnalysis) : null,
+    insight,
+  ];
+
   const { rows } = await pool.query(query, values);
   return rows[0];
 }

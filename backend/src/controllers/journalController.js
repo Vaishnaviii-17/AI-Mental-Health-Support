@@ -7,6 +7,7 @@ const {
   resolveEmotion,
   resolveRisk,
 } = require("../utils/mlMapping");
+const geminiService = require("../services/geminiService");
 const response = require("../utils/response");
 const asyncHandler = require("../utils/asyncHandler");
 
@@ -46,6 +47,7 @@ const createJournal = asyncHandler(async (req, res) => {
   if (!title || !title.trim()) {
     return res.status(400).json(response.error("Title is required"));
   }
+
   if (!content || !content.trim()) {
     return res.status(400).json(response.error("Journal content is required"));
   }
@@ -56,15 +58,21 @@ const createJournal = asyncHandler(async (req, res) => {
   //    via the Python inference server. A single call -- Python
   //    already returns emotion, sentiment, AND risk together.
   let analysis;
+
   try {
     analysis = await inferenceService.analyzeText(trimmedContent);
   } catch (err) {
     console.error("Journal ML analysis failed:", err.message);
+
     // Do not save a journal entry we couldn't analyze, and never leak
     // the underlying Python error/stack trace to the client.
     return res
       .status(503)
-      .json(response.error("Emotion analysis service is temporarily unavailable."));
+      .json(
+        response.error(
+          "Emotion analysis service is temporarily unavailable."
+        )
+      );
   }
 
   // 2. Map the ML analysis onto the EXISTING journal schema
@@ -111,16 +119,9 @@ const createJournal = asyncHandler(async (req, res) => {
   // here. A journal entry is not the same thing as an explicit mood
   // check-in -- see moodAnalysisService.js.
 
-  // 3. Return the saved journal AND the full ML analysis (including
-  //    goemotions detail and the full risk breakdown) so the frontend
-  //    has everything it needs without calling the Python server
-  //    directly.
-  res.status(201).json(
-    response.success("Journal entry saved successfully", {
-      journal,
-      analysis,
-    })
-  );
+  res
+    .status(201)
+    .json(response.success("Journal entry saved successfully", journal));
 });
 
 /**

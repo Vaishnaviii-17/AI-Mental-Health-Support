@@ -13,7 +13,6 @@ const authMiddleware = async (req, res, next) => {
       new UnauthorizedError("Access token is missing.")
     );
   }
-
   const token = authHeader.split(" ")[1];
 
   if (!token) {
