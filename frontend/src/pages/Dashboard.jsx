@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
-
 import Navbar from "../components/Navbar/Navbar";
 import WelcomeCard from "../components/dashboard/WelcomeCard";
 import MoodCard from "../components/dashboard/LatestMoodCard";
@@ -168,7 +167,6 @@ function Dashboard() {
           </div>
         </main>
       )}
-
       {data && !moodLoading && showMoodModal && (
         <MoodCheckInModal
           mood={editingMood}

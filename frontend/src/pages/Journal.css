@@ -535,3 +535,173 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* --------------------------------------------------------------
+   Risk screening UI additions -- append to the existing Journal.css.
+   The original file wasn't included in the provided project material,
+   so these are new rules only; they don't touch any existing class.
+   Colors intentionally muted/neutral rather than alarming reds for
+   "elevated", escalating only for "high"/"critical".
+   -------------------------------------------------------------- */
+
+.journal-risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+
+.journal-risk-badge--low {
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--text-secondary, #6b7280);
+}
+
+.journal-risk-badge--elevated {
+  background: rgba(217, 164, 6, 0.14);
+  color: #9a6b00;
+}
+
+.journal-risk-badge--high {
+  background: rgba(217, 119, 6, 0.16);
+  color: #b45309;
+}
+
+.journal-risk-badge--critical {
+  background: rgba(220, 38, 38, 0.14);
+  color: #b91c1c;
+}
+
+.journal-risk-footer {
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.journal-risk-disclaimer {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin: 2px 0 10px;
+}
+
+.journal-risk-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.journal-risk-summary--low {
+  color: var(--text-secondary, #6b7280);
+  font-weight: 500;
+}
+
+.journal-risk-summary--elevated {
+  background: rgba(217, 164, 6, 0.1);
+  color: #9a6b00;
+}
+
+.journal-risk-summary--high {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
+.journal-risk-summary--critical {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+.journal-risk-categories {
+  margin-top: 8px;
+}
+
+.journal-risk-category-list {
+  list-style: disc;
+  margin: 6px 0 0 18px;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.journal-risk-category-list li {
+  margin-bottom: 2px;
+}
+
+.journal-risk-protective {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  margin-top: 8px;
+}
+
+/* --------------------------------------------------------------
+   FIX: "Other detected emotions" typography.
+   These classes (journal-analysis-secondary*, journal-secondary-
+   emotion-*) were referenced in Journal.jsx but never had matching
+   rules, so the browser's default (unstyled) span/ul/li sizing was
+   showing through -- that's the "noticeably larger/different" text.
+   Sized to match the existing AI Mood Reflection hierarchy:
+   subsection label like the "Dominant Emotion" / "Wellness Score"
+   labels (small, muted, uppercase), value/body text matching the
+   reflection paragraph size. Also used by "Detected risk
+   categories" in the risk panel, so this fixes both instances of
+   the same unstyled-label bug.
+   -------------------------------------------------------------- */
+.journal-analysis-secondary {
+  margin-top: 10px;
+}
+
+.journal-analysis-secondary-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 6px;
+}
+
+.journal-secondary-emotion-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.journal-secondary-emotion-list li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.3;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--surface-muted, rgba(107, 114, 128, 0.08));
+  white-space: nowrap;
+}
+
+.journal-secondary-emotion-name {
+  color: var(--text-primary, #374151);
+}
+
+.journal-secondary-emotion-pct {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+}
+
+.journal-analysis-secondary-empty {
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}

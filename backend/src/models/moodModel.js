@@ -222,7 +222,7 @@ async function getMoodHistory(userId) {
 }
 
 /**
- * Calculate aggregate mood analytics for a user.
+ * Calculate aggregate mood analytics for a user
  */
 async function getMoodStats(userId) {
   // 1. Get average mood score
@@ -373,7 +373,8 @@ async function getMoodStats(userId) {
 }
 
 /**
- * Get daily activity counts for the last 12 months.
+ * Get daily activity counts for the last 12 months
+ * Aggregates journal entries + mood check-ins + chat messages per calendar day
  */
 async function getActivityCalendar(userId) {
   const query = `
@@ -415,9 +416,9 @@ async function getActivityCalendar(userId) {
     GROUP BY day
     ORDER BY day ASC;
   `;
-
+  
   const { rows } = await pool.query(query, [userId]);
-
+  
   return rows;
 }
 

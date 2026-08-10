@@ -34,10 +34,12 @@ async function findByUsername(username) {
 
 /**
  * Find user by ID
+ * Anonymous-user system:
+ * We only retrieve fields that exist in the users table.
  */
 async function findById(id) {
   const query = `
-    SELECT id, username, email, full_name, created_at, updated_at
+    SELECT id, username, created_at
     FROM users
     WHERE id = $1;
   `;
@@ -65,20 +67,20 @@ async function updatePassword(id, hashedPassword) {
 }
 
 /**
- * Update user profile details
+ * Update user profile
+ * Anonymous-user system:
+ * Only username is editable.
  */
-async function updateProfile(id, { username, email, full_name }) {
+async function updateProfile(id, { username }) {
   const query = `
     UPDATE users
     SET username = $1,
-        email = $2,
-        full_name = $3,
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = $4
-    RETURNING id, username, email, full_name, created_at, updated_at;
+    WHERE id = $2
+    RETURNING id, username, created_at, updated_at;
   `;
 
-  const { rows } = await pool.query(query, [username, email, full_name, id]);
+  const { rows } = await pool.query(query, [username, id]);
 
   return rows[0] || null;
 }

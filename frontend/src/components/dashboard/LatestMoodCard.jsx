@@ -75,6 +75,12 @@ function LatestMoodCard({ mood, onUpdate }) {
 
   const moodColor =
     MOOD_COLORS[mood.emotion] || MOOD_COLORS.Content;
+  const detectedAt =
+  mood.detected_at ||
+  mood.detectedAt ||
+  mood.created_at ||
+  mood.createdAt ||
+  null;
 
   return (
     <article
@@ -112,20 +118,22 @@ function LatestMoodCard({ mood, onUpdate }) {
           {mood.emotion}
         </h3>
 
-        <p className="dashboard-mood-card__time">
-          Detected{" "}
-          {mood.detectedAt ||
-            (mood.updated_at
-              ? new Date(mood.updated_at).toLocaleTimeString([], {
-                  hour: "numeric",
-                  minute: "2-digit",
-                }): mood.created_at
-              ? new Date(mood.created_at).toLocaleTimeString([], {
-                  hour: "numeric",
-                  minute: "2-digit",
-                })
-              : "Today")}
-        </p>
+        {detectedAt && (
+          <p className="dashboard-mood-card__time">
+            Detected {detectedAt}
+          </p>
+      )}
+
+        {mood.confidence !== undefined &&
+          mood.confidence !== null && (
+            <div className="dashboard-confidence">
+              <span>Confidence</span>
+
+              <strong>
+                {mood.confidence}%
+              </strong>
+            </div>
+          )}
 
         {mood.note && (
           <div className="dashboard-mood-note">
@@ -147,17 +155,14 @@ function LatestMoodCard({ mood, onUpdate }) {
             <p>{mood.insight}</p>
           </div>
         )}
-
       </div>
 
       <div className="dashboard-mood-actions">
-
         <button
           type="button"
           className="dashboard-text-link"
           onClick={() => onUpdate?.(mood)}
         >
-          <Pencil size={15} />
           Update Mood
         </button>
 
@@ -166,12 +171,9 @@ function LatestMoodCard({ mood, onUpdate }) {
           className="dashboard-text-link"
         >
           <History size={15} />
-
           History
         </Link>
-
       </div>
-
     </article>
   );
 }

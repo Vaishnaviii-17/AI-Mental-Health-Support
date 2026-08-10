@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BookOpen, Calendar, Trash2, X, AlertCircle, Smile, Search, Filter, ArrowUpDown, ChevronDown } from "lucide-react";
+import { BookOpen, Calendar, Trash2, X, AlertCircle, Smile, Search, Filter, ArrowUpDown, ChevronDown, ShieldAlert } from "lucide-react";
 import Navbar from "../components/Navbar/Navbar";
 import { getJournals, createJournal, deleteJournal } from "../services/journalService";
 import "./Journal.css";
@@ -11,6 +11,65 @@ function getStoredUser() {
   } catch {
     return null;
   }
+}
+
+// Turn a GoEmotions probability (0-1) into a display percentage
+// string. Handles null/undefined safely (the dominant emotion's
+// probability can be null for the controlled "no trained neutral
+// label" fallback -- see predictor.py).
+function formatEmotionPercent(probability) {
+  if (probability === null || probability === undefined || Number.isNaN(Number(probability))) {
+    return null;
+  }
+  return `${(Number(probability) * 100).toFixed(1)}%`;
+}
+
+// Consistent display label for any GoEmotions emotion (or the
+// "neutral" sentinel). Missing/empty emotion and the literal
+// "neutral" label both render as "Neutral" -- never "Unknown".
+function displayEmotionLabel(emotion) {
+  if (!emotion) return "Neutral";
+  if (emotion === "neutral") return "Neutral";
+  return emotion.charAt(0).toUpperCase() + emotion.slice(1);
+}
+
+// ---------------------------------------------------------------
+// RISK SCREENING DISPLAY HELPERS
+// ---------------------------------------------------------------
+// Risk screening is a heuristic indicator computed by the trained
+// GoEmotions model + regex text patterns in predictor.py -- it is
+// NEVER a clinical assessment or diagnosis. All copy below is
+// written to reflect that: "Risk screening", "heuristic screening
+// indicator", never "you are suicidal" / "you have depression".
+// ---------------------------------------------------------------
+
+const RISK_LEVEL_DISPLAY = {
+  low: { label: "Low", tone: "low" },
+  elevated: { label: "Elevated", tone: "elevated" },
+  high: { label: "High", tone: "high" },
+  critical: { label: "Critical", tone: "critical" },
+};
+
+// Human-readable labels for risk categories from predictor.py's
+// RISK_PATTERNS -- raw category keys / regex patterns are never
+// shown to the user.
+const RISK_CATEGORY_LABELS = {
+  suicidal_ideation: "Thoughts of not wanting to live",
+  self_harm: "Self-harm related language",
+  hopelessness: "Hopelessness",
+  feeling_trapped: "Feeling trapped",
+  severe_distress: "Severe distress",
+};
+
+function riskCategoryLabel(category) {
+  return RISK_CATEGORY_LABELS[category] || category;
+}
+
+function formatRiskPercent(score) {
+  if (score === null || score === undefined || Number.isNaN(Number(score))) {
+    return null;
+  }
+  return `${Math.round(Number(score) * 100)}%`;
 }
 
 function JournalPage() {
@@ -27,10 +86,10 @@ function JournalPage() {
   const [searchText, setSearchText] = useState("");
   const [emotionFilter, setEmotionFilter] = useState("All");
   const [dateSort, setDateSort] = useState("newest");
-  
+
   // Pagination
   const [visibleCount, setVisibleCount] = useState(6);
-  
+
   // Modal / View Entry state
   const [activeJournal, setActiveJournal] = useState(null);
 
@@ -68,15 +127,21 @@ function JournalPage() {
     setSuccess(false);
 
     try {
-      const newEntry = await createJournal({
+      const created = await createJournal({
         title: form.title.trim(),
         content: form.content.trim()
       });
-      
+
+      // The API returns { journal, analysis }. The saved journal row
+      // (including the persisted `emotion`, `secondary_emotions`, and
+      // `risk_analysis` fields) is what belongs in the list -- not
+      // the wrapper object.
+      const newEntry = created?.journal || created;
+
       setJournals((prev) => [newEntry, ...prev]);
       setForm({ title: "", content: "" });
       setSuccess(true);
-      
+
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
       console.error("Error saving journal entry", err);
@@ -116,7 +181,10 @@ function JournalPage() {
     }
   };
 
-  // List of unique emotions for filter dropdown
+  // List of unique emotions for filter dropdown. GoEmotions is
+  // fine-grained/multi-label, so this is not restricted to any fixed
+  // set of emotions -- it simply reflects whatever labels have
+  // actually been detected across the user's entries.
   const uniqueEmotions = useMemo(() => {
     const list = new Set();
     journals.forEach(j => {
@@ -158,6 +226,33 @@ function JournalPage() {
   };
 
   const characterCount = form.content.length;
+
+  // Secondary emotions for the entry currently open in the modal, if
+  // any. Read directly from the API response / stored journal row --
+  // never hardcoded.
+  const activeSecondaryEmotions = Array.isArray(activeJournal?.secondary_emotions)
+    ? activeJournal.secondary_emotions
+    : [];
+
+  // Risk screening for the entry currently open in the modal. Older
+  // rows saved before the risk_analysis column existed (or before a
+  // migration was run) will have risk_analysis = null/undefined --
+  // handled safely here so the UI never crashes and simply omits the
+  // risk panel for those entries.
+  const activeRiskAnalysis =
+    activeJournal?.risk_analysis && typeof activeJournal.risk_analysis === "object"
+      ? activeJournal.risk_analysis
+      : null;
+
+  const activeRiskLevel = activeRiskAnalysis?.risk_level || null;
+  const activeRiskDisplay = activeRiskLevel
+    ? RISK_LEVEL_DISPLAY[activeRiskLevel] || { label: activeRiskLevel, tone: "low" }
+    : null;
+  const activeRiskCategories = Array.isArray(activeRiskAnalysis?.detected_risk_categories)
+    ? activeRiskAnalysis.detected_risk_categories
+    : [];
+  const activeProtectiveSignals = Number(activeRiskAnalysis?.protective_text_signals) || 0;
+  const activeRiskPercent = formatRiskPercent(activeRiskAnalysis?.risk_score);
 
   return (
     <>
@@ -270,12 +365,11 @@ function JournalPage() {
                     value={searchText}
                     onChange={(e) => {
                       setSearchText(e.target.value);
-                      setVisibleCount(6); 
+                      setVisibleCount(6);
                     }}
                     className="search-input"
                   />
-                </div>
-                
+                </div>          
                 <div className="controls-dropdowns-row">
                   <div className="filter-select-group">
                     <Filter size={12} className="control-icon" />
@@ -283,14 +377,14 @@ function JournalPage() {
                       value={emotionFilter}
                       onChange={(e) => {
                         setEmotionFilter(e.target.value);
-                        setVisibleCount(6); 
+                        setVisibleCount(6);
                       }}
                       className="control-select"
                       aria-label="Filter entries by emotion"
                     >
                       {uniqueEmotions.map(emotion => (
                         <option key={emotion} value={emotion}>
-                          {emotion === "All" ? "All Emotions" : emotion}
+                          {emotion === "All" ? "All Emotions" : displayEmotionLabel(emotion)}
                         </option>
                       ))}
                     </select>
@@ -436,34 +530,138 @@ function JournalPage() {
                 <p className="journal-modal-content">{activeJournal.content}</p>
               </div>
 
-              {(activeJournal.emotion || activeJournal.sentiment_score || activeJournal.insight) && (
+                            {(activeJournal.emotion ||
+                (activeJournal.sentiment_score !== null &&
+                  activeJournal.sentiment_score !== undefined) ||
+                activeJournal.insight) && (
                 <footer className="journal-modal-footer">
                   <div className="journal-analysis-header">
                     <Smile size={14} />
                     <h4>AI Mood Reflection</h4>
                   </div>
+
                   <div className="journal-analysis-grid">
                     {activeJournal.emotion && (
                       <div className="analysis-item">
-                        <span>Emotion</span>
-                        <strong>{activeJournal.emotion}</strong>
+                        <span>Dominant Emotion</span>
+                        <strong>
+                          {displayEmotionLabel(activeJournal.emotion)}
+                        </strong>
                       </div>
                     )}
-                    {activeJournal.sentiment_score && (
-                      <div className="analysis-item">
-                        <span>Wellness Score</span>
-                        <strong>{activeJournal.sentiment_score} / 5</strong>
-                      </div>
+
+                    {activeJournal.sentiment_score !== null &&
+                      activeJournal.sentiment_score !== undefined && (
+                        <div className="analysis-item">
+                          <span>Wellness Score</span>
+                          <strong>
+                            {activeJournal.sentiment_score} / 5
+                          </strong>
+                        </div>
+                      )}
+                  </div>
+
+                  <div className="journal-analysis-secondary">
+                    <span className="journal-analysis-secondary-label">
+                      Other detected emotions
+                    </span>
+
+                    {activeSecondaryEmotions.length > 0 ? (
+                      <ul className="journal-secondary-emotion-list">
+                        {activeSecondaryEmotions.map((item, idx) => {
+                          const pct = formatEmotionPercent(item.probability);
+
+                          return (
+                            <li key={`${item.label}-${idx}`}>
+                              <span className="journal-secondary-emotion-name">
+                                {displayEmotionLabel(item.label)}
+                              </span>
+
+                              {pct && (
+                                <span className="journal-secondary-emotion-pct">
+                                  {pct}
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="journal-analysis-secondary-empty">
+                        No additional strong emotional signals detected.
+                      </p>
                     )}
                   </div>
+
                   {activeJournal.insight && (
                     <div className="journal-analysis-insight">
-                      <p><strong>Reflection:</strong> {activeJournal.insight}</p>
+                      <p>
+                        <strong>Reflection:</strong> {activeJournal.insight}
+                      </p>
                     </div>
                   )}
                 </footer>
               )}
-            </motion.div>
+
+              {/* Risk screening panel */}
+              {activeRiskAnalysis && (
+                <footer className="journal-modal-footer journal-risk-footer">
+                  <div className="journal-analysis-header">
+                    <ShieldAlert size={14} />
+                    <h4>Risk Screening</h4>
+                  </div>
+
+                  <p className="journal-risk-disclaimer">
+                    Heuristic screening indicator, not a clinical assessment.
+                  </p>
+
+                  {activeRiskLevel === "low" ? (
+                    <p className="journal-risk-summary journal-risk-summary--low">
+                      Risk screening: Low
+                    </p>
+                  ) : (
+                    <>
+                      <div
+                        className={`journal-risk-summary journal-risk-summary--${activeRiskLevel}`}
+                      >
+                        <span>
+                          Risk Level:{" "}
+                          {activeRiskDisplay?.label || activeRiskLevel}
+                        </span>
+
+                        {activeRiskPercent && (
+                          <span>Risk Score: {activeRiskPercent}</span>
+                        )}
+                      </div>
+
+                      {activeRiskCategories.length > 0 && (
+                        <div className="journal-risk-categories">
+                          <span className="journal-analysis-secondary-label">
+                            Detected risk categories
+                          </span>
+
+                          <ul className="journal-risk-category-list">
+                            {activeRiskCategories.map((category) => (
+                              <li key={category}>
+                                {riskCategoryLabel(category)}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {activeProtectiveSignals > 0 && (
+                    <p className="journal-risk-protective">
+                      {activeProtectiveSignals} protective signal
+                      {activeProtectiveSignals === 1 ? "" : "s"} also detected
+                      in this entry.
+                    </p>
+                  )}
+                </footer>
+              )}
+              </motion.div>
           </div>
         )}
       </AnimatePresence>
