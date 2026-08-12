@@ -8,6 +8,7 @@ import JournalPage from "./pages/Journal";
 import ChatPage from "./pages/Chat";
 import ProfilePage from "./pages/Profile";
 import AnalyticsPage from "./pages/Analytics";
+import FocusTimerPage from "./pages/FocusTimer";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./styles/global.css";
 
@@ -57,6 +58,14 @@ function App() {
         element={
           <ProtectedRoute>
             <AnalyticsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/focus-timer"
+        element={
+          <ProtectedRoute>
+            <FocusTimerPage />
           </ProtectedRoute>
         }
       />
