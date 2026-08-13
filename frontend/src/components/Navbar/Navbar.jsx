@@ -19,7 +19,6 @@ const DASHBOARD_LINKS = [
   { label: "Journal", href: "/journal" },
   { label: "Activities", href: "/dashboard#recommendation" },
   { label: "AI Chat", href: "/chat" },
-  { label: "Focus Timer", href: "/focus-timer" },
   { label: "Analytics", href: "/analytics" },
   { label: "Profile", href: "/profile" },
 ];

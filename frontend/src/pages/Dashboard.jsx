@@ -152,7 +152,7 @@ function Dashboard() {
                   setShowMoodModal(true);
                 }}
               />
-              <MoodChart entries={data.moodHistory} />
+              <MoodChart />
             </section>
             <SummaryCards summary={data.summary} />
             <QuickActions />

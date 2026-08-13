@@ -37,6 +37,25 @@ const MOOD_COLORS = {
   },
 };
 
+const formatMoodDateTime = (date) => {
+  if (!date) return "";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "";
+  }
+
+  return parsedDate.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+
 function LatestMoodCard({ mood, onUpdate }) {
   if (!mood) {
     return (
@@ -120,20 +139,9 @@ function LatestMoodCard({ mood, onUpdate }) {
 
         {detectedAt && (
           <p className="dashboard-mood-card__time">
-            Detected {detectedAt}
+            Detected {formatMoodDateTime(detectedAt)}
           </p>
-      )}
-
-        {mood.confidence !== undefined &&
-          mood.confidence !== null && (
-            <div className="dashboard-confidence">
-              <span>Confidence</span>
-
-              <strong>
-                {mood.confidence}%
-              </strong>
-            </div>
-          )}
+        )}
 
         {mood.note && (
           <div className="dashboard-mood-note">
