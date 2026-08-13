@@ -19,6 +19,7 @@ const DASHBOARD_LINKS = [
   { label: "Journal", href: "/journal" },
   { label: "Activities", href: "/dashboard#recommendation" },
   { label: "AI Chat", href: "/chat" },
+  { label: "Focus Timer", href: "/focus-timer" },
   { label: "Analytics", href: "/analytics" },
   { label: "Profile", href: "/profile" },
 ];
@@ -27,7 +28,7 @@ function Navbar({ profile }) {
   const location = useLocation();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const isAppPage = ["/dashboard", "/chat", "/journal", "/analytics", "/profile"].includes(location.pathname);
+  const isAppPage = ["/dashboard", "/chat", "/journal", "/analytics", "/profile", "/focus-timer"].includes(location.pathname);
   const links = isAppPage ? DASHBOARD_LINKS : NAV_LINKS;
   const avatarInitial = profile?.username?.charAt(0)?.toUpperCase() || "M";
 

@@ -1,0 +1,44 @@
+.focus-timer-page {
+  min-height: calc(100vh - var(--nav-height));
+  display: grid;
+  align-items: center;
+  padding: var(--space-xl) 0;
+}
+
+.focus-timer {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.7fr) minmax(0, 1.3fr);
+  align-items: center;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  overflow: hidden;
+  color: var(--cream-100);
+  border-radius: var(--radius-lg);
+  background: radial-gradient(100% 150% at 100% 0%, var(--forest-500), var(--forest-800) 58%, var(--forest-900));
+  box-shadow: var(--shadow-lg);
+}
+.focus-timer--break { background: radial-gradient(100% 150% at 100% 0%, #208c8d, #116466 58%, #0c474a); }
+.focus-timer__intro h2 { margin-top: var(--space-xs); color: var(--cream-100); font-size: var(--fs-2xl); }
+.focus-timer__intro p { max-width: 240px; margin-top: var(--space-sm); color: var(--text-on-dark-muted); font-size: var(--fs-sm); }
+.focus-timer__main { display: grid; justify-items: center; padding: var(--space-md); border: 1px solid var(--border-on-dark); border-radius: var(--radius-lg); background: rgba(255, 255, 255, 0.06); }
+.focus-timer__mode { color: var(--sage-100); font-size: var(--fs-xs); font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; }
+.focus-timer--break .focus-timer__mode { color: #c9f0e6; }
+.focus-timer__display { margin: var(--space-2xs) 0 0; color: var(--cream-100); font-family: var(--font-body); font-size: 96px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.07em; }
+.focus-timer__session { margin-top: var(--space-xs); color: var(--text-on-dark-muted); font-size: var(--fs-xs); font-weight: 700; }
+.focus-timer__controls { display: flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: 46px; margin-top: var(--space-md); }
+.focus-timer__start { min-width: 112px; padding: 0.72rem 1.25rem; color: #5a260d; border-radius: var(--radius-full); background: #f3a35c; font-size: var(--fs-xs); font-weight: 800; transition: transform var(--dur-fast), background var(--dur-fast); }
+.focus-timer__start--running { color: #123d28; background: #9bd89e; }
+.focus-timer__start:hover { transform: translateY(-2px); }
+.focus-timer__icon-button { display: grid; width: 42px; height: 42px; place-items: center; color: var(--cream-100); border: 1px solid var(--border-on-dark); border-radius: 50%; background: rgba(255, 255, 255, 0.07); }
+.focus-timer__icon-button:hover { background: rgba(255, 255, 255, 0.16); }
+
+@media (max-width: 760px) {
+  .focus-timer-page { align-items: start; padding: var(--space-md) 0; }
+  .focus-timer { grid-template-columns: 1fr; padding: var(--space-lg); gap: var(--space-md); }
+  .focus-timer__intro { text-align: center; }
+  .focus-timer__intro p { margin-inline: auto; }
+}
+@media (max-width: 480px) {
+  .focus-timer__main { padding: var(--space-sm); }
+  .focus-timer__display { font-size: clamp(4rem, 22vw, 6rem); }
+}
