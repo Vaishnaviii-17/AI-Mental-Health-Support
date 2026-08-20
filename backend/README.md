@@ -17,12 +17,12 @@ This backend provides REST APIs for:
 
 * Node.js
 * Express.js
-* MongoDB
-* Mongoose
+* PostgreSQL
 * JWT Authentication
 * bcryptjs
 * dotenv
 * express-rate-limit
+* Python AI service for GoEmotions analysis and Whisper transcription
 
 ## Project Structure
 
@@ -76,13 +76,47 @@ http://localhost:5000
 ## Current Status
 
 * [x] Initial Backend Setup
-* [ ] MongoDB Connection
-* [ ] Authentication APIs
-* [ ] Mood APIs
-* [ ] Journal APIs
+* [x] PostgreSQL Connection
+* [x] Authentication APIs
+* [x] Mood APIs
+* [x] Journal APIs
 * [ ] Chat APIs
-* [ ] AI Engine Integration
+* [x] AI Engine Integration
 * [ ] Deployment
+
+## Voice Journaling Transcription
+
+The journal voice flow is:
+
+```text
+React MediaRecorder
+  -> Express /api/journal/transcribe
+  -> Python AI service /transcribe
+  -> faster-whisper
+  -> editable journal textarea
+  -> existing Save Entry / GoEmotions flow
+```
+
+Audio is temporary. Express keeps the uploaded file in memory, and the Python
+service deletes its temporary Whisper input file after processing.
+
+Install Python AI dependencies:
+
+```bash
+cd backend/python
+pip install -r requirements.txt
+python inference_server.py
+```
+
+Manual transcription test:
+
+```bash
+cd backend/python
+python test_transcription.py path\to\sample-english-audio.webm
+```
+
+English is the only supported transcription language right now. Hindi and
+Marathi are reserved for future work.
 
 ## Team
 

@@ -31,6 +31,7 @@ This project is being developed as a **Final Year B.Tech Computer Engineering Pr
 - Daily Mood Tracking
 - Mood History
 - Personal Journal
+- English Voice Journaling with Whisper Speech-to-Text
 - AI Mental Health Chatbot
 - Personalized Recommendations
 - Mental Health Resources
@@ -184,6 +185,33 @@ http://localhost:5000
 
 ---
 
+## Start Python AI Service
+
+The Python service runs the existing GoEmotions journal analysis at
+`POST /predict` and the Whisper transcription endpoint at `POST /transcribe`.
+
+```bash
+cd backend/python
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python inference_server.py
+```
+
+AI service runs at
+
+```text
+http://127.0.0.1:5001
+```
+
+Configure the Node backend with:
+
+```env
+ML_INFERENCE_URL=http://127.0.0.1:5001
+```
+
+---
+
 ## Start Frontend
 
 ```bash
@@ -196,6 +224,69 @@ Frontend runs at
 ```
 http://localhost:5173
 ```
+
+---
+
+# Voice Journaling
+
+Voice journaling is an additional input method for the existing journal form.
+It does not replace typed journals or the GoEmotions analysis pipeline.
+
+```text
+Microphone
+  ↓
+Browser MediaRecorder audio
+  ↓
+Node/Express POST /api/journal/transcribe
+  ↓
+Python AI service POST /transcribe
+  ↓
+faster-whisper speech-to-text
+  ↓
+Editable transcript in the journal textarea
+  ↓
+Existing Save Entry flow
+  ↓
+Existing GoEmotions emotion, wellness, and risk analysis
+```
+
+Current support is English only. Hindi and Marathi are planned for later, but
+no language selector, translation, or multilingual emotion model is included
+yet.
+
+Whisper settings are centralized in environment variables:
+
+```env
+WHISPER_MODEL_SIZE=tiny.en
+WHISPER_LANGUAGE=en
+WHISPER_DEVICE=auto
+WHISPER_COMPUTE_TYPE=int8
+TRANSCRIPTION_MAX_AUDIO_BYTES=10485760
+TRANSCRIPTION_TIMEOUT_MS=60000
+```
+
+The default model is `tiny.en`, chosen for local development speed and lower
+resource use. Larger models can be configured later through `WHISPER_MODEL_SIZE`
+without changing the journal UI.
+
+Audio privacy handling:
+
+- Browser audio is uploaded only for transcription.
+- Node keeps the upload in memory and does not write an audio file.
+- The Python service writes a temporary file only for Whisper processing.
+- Temporary audio is deleted in a cleanup block after success or failure.
+- Audio files, audio URLs, and raw recordings are not stored in PostgreSQL.
+
+Manual transcription smoke test:
+
+```bash
+cd backend/python
+python test_transcription.py path\to\sample-english-audio.webm
+```
+
+Suggested samples: a short English sentence, multiple sentences, normal
+speaking speed, pauses, and Indian English pronunciation. The repository does
+not include voice recordings because journal audio is sensitive.
 
 ---
 
