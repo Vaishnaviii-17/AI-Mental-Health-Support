@@ -55,6 +55,7 @@ function uploadAudio(req, res, next) {
 router.use(authMiddleware);
 
 router.get("/", journalController.getJournals);
+router.get("/recent", journalController.getRecentJournals);
 router.post("/transcribe", uploadAudio, journalController.transcribeJournalAudio);
 router.get("/:id", journalController.getJournalById);
 router.post("/", journalController.createJournal);

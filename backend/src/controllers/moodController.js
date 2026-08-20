@@ -399,6 +399,61 @@ const getActivityCalendar = asyncHandler(async (req, res) => {
   );
 });
 
+/**
+ * Get the latest mood activity across manual check-ins, journal entries,
+ * and analyzed chat messages. Returns a unified shape for the dashboard card.
+ */
+const getLatestMood = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const pool = require("../config/db");
+
+  // 1. Latest manual mood check-in
+  const moodRes = await pool.query(
+    `SELECT emoji, emotion, score, confidence, created_at AS detected_at, note, 'manual' AS source
+     FROM moods
+     WHERE user_id = $1
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [userId]
+  );
+
+  // 2. Latest journal with emotion
+  const journalRes = await pool.query(
+    `SELECT mood AS emoji, emotion, sentiment_score AS score, NULL AS confidence, created_at AS detected_at, NULL AS note, 'journal' AS source
+     FROM journals
+     WHERE user_id = $1 AND emotion IS NOT NULL
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [userId]
+  );
+
+  // 3. Latest analyzed user chat message
+  const chatRes = await pool.query(
+    `SELECT NULL AS emoji, emotion, score, NULL AS confidence, created_at AS detected_at, NULL AS note, 'chat' AS source
+     FROM chats
+     WHERE user_id = $1 AND sender = 'user' AND emotion IS NOT NULL
+     ORDER BY created_at DESC
+     LIMIT 1`,
+    [userId]
+  );
+
+  const candidates = [
+    moodRes.rows[0],
+    journalRes.rows[0],
+    chatRes.rows[0],
+  ].filter(Boolean);
+
+  if (candidates.length === 0) {
+    return res.status(200).json(response.success("No mood activity found", null));
+  }
+
+  // Pick the most recent across all three sources
+  candidates.sort((a, b) => new Date(b.detected_at) - new Date(a.detected_at));
+  const latest = candidates[0];
+
+  res.status(200).json(response.success("Latest mood retrieved successfully", latest));
+});
+
 module.exports = {
   createMood,
   getTodayAnalysis,
@@ -408,4 +463,5 @@ module.exports = {
   getStats,
   getHistory,
   getActivityCalendar,
+  getLatestMood,
 };

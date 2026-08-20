@@ -790,3 +790,121 @@ body.modal-open {
   position: relative;
   z-index: 1;
 }
+
+/* ── Streak Toast ───────────────────────────────── */
+.streak-toast {
+  position: fixed;
+  bottom: var(--space-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--forest-700);
+  color: var(--cream-100);
+  border-radius: var(--radius-full);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+.streak-toast__icon {
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+.streak-toast__close {
+  background: transparent;
+  border: none;
+  color: var(--cream-300);
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 0 0 var(--space-xs);
+  margin-left: auto;
+}
+.streak-toast__close:hover {
+  color: var(--cream-100);
+}
+
+/* ── Mood Sources Checklist ─────────────────────── */
+.dashboard-mood-sources {
+  list-style: none;
+  margin: var(--space-xs) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dashboard-mood-sources li {
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2xs);
+}
+.dashboard-mood-sources .source--active {
+  color: var(--forest-600);
+}
+.dashboard-mood-sources .source--inactive {
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+
+/* Right column wrapper in dashboard-content-grid */
+.dashboard-right-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Wellness Activities Widget */
+.wellness-activities-widget {
+  padding: var(--space-md) var(--space-lg);
+}
+
+.wellness-widget-loading {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-xs);
+}
+
+.wellness-widget-body {
+  margin-top: var(--space-xs);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.wellness-metric-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.wellness-metric-row strong {
+  color: var(--forest-900);
+  font-weight: 700;
+}
+
+.wellness-empty-hint {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 2px 0;
+}
+
+.wellness-view-btn {
+  margin-top: var(--space-xs);
+  width: 100%;
+  justify-content: center;
+  font-size: var(--fs-xs);
+  min-height: 34px;
+  border-color: var(--forest-100);
+}
+
+

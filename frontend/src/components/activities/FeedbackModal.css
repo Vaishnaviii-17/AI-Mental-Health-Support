@@ -1,0 +1,113 @@
+.feedback-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(47, 133, 90, 0.15);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.feedback-modal {
+  background: var(--cream-100);
+  border: 1px solid var(--forest-100);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  width: 100%;
+  max-width: 400px;
+  padding: var(--space-lg) var(--space-xl);
+  text-align: center;
+}
+
+.feedback-modal__header h2 {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--forest-900);
+  margin-bottom: var(--space-3xs);
+}
+
+.feedback-modal__header p {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-md);
+}
+
+.feedback-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  margin-bottom: var(--space-lg);
+}
+
+.feedback-option-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--cream-50);
+  border: 1px solid var(--forest-50);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.feedback-option-btn:hover {
+  border-color: var(--forest-300);
+  background: var(--cream-200);
+}
+
+.feedback-option-btn.active {
+  border-color: var(--forest-500);
+  background: #f0fdf4;
+}
+
+.feedback-option-dot {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--forest-300);
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.feedback-option-btn.active .feedback-option-dot {
+  border-color: var(--forest-600);
+  background: var(--forest-600);
+}
+
+.feedback-option-btn.active .feedback-option-dot::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+}
+
+.feedback-option-label {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--forest-800);
+}
+
+.feedback-actions {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.feedback-actions .btn {
+  flex: 1;
+  min-height: 38px;
+  font-size: var(--fs-xs);
+}
+
+.skip-btn {
+  border-color: var(--cream-400);
+}

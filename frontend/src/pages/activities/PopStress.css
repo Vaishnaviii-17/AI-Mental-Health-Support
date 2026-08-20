@@ -1,0 +1,403 @@
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.pop-stress-main {
+  display: flex;
+  justify-content: center;
+  padding-bottom: var(--space-lg);
+}
+
+/* ── Intro / Complete card ───────────────────────────────────────────────── */
+.pop-card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--cream-100);
+  border: 1px solid var(--forest-100);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-lg) var(--space-xl);
+  text-align: center;
+}
+
+.pop-card__icon {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: var(--space-sm);
+}
+
+.pop-card h2 {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: var(--forest-900);
+  margin-bottom: var(--space-xs);
+}
+
+.pop-card > p {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  margin-bottom: var(--space-md);
+}
+
+/* Re-used helpers (also defined in BreathingBubble.css — these are local overrides) */
+.session-info-box {
+  background: var(--cream-50);
+  border: 1px solid var(--forest-50);
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-xs);
+}
+
+.info-label { color: var(--text-muted); font-weight: 500; }
+.info-val   { color: var(--forest-900); font-weight: 700; }
+
+.start-session-btn {
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--fs-sm);
+}
+
+/* ── End reason pills ────────────────────────────────────────────────────── */
+.end-reason {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  padding: var(--space-2xs) var(--space-sm);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+}
+
+.end-reason--danger { background: #fef2f2; color: #b91c1c; }
+.end-reason--miss   { background: #fffbeb; color: #92400e; }
+.end-reason--ok     { background: #f0fdf4; color: #166534; }
+
+/* ── Playing layout ──────────────────────────────────────────────────────── */
+.pop-playing {
+  width: 100%;
+  max-width: 700px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+/* ── Stats bar ───────────────────────────────────────────────────────────── */
+.pop-stats-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--cream-100);
+  border: 1px solid var(--forest-100);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xs) var(--space-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.pop-stat         { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.pop-stat--center { align-items: center; }
+
+.stat-lbl            { font-size: var(--fs-2xs); color: var(--text-muted); }
+.stat-val            { font-size: var(--fs-lg);  color: var(--forest-900); font-weight: 800; }
+.stat-val--timer     { font-size: 1.6rem; color: var(--forest-700); }
+.stat-val--urgent    { color: #c0392b !important; }
+.stat-val--warn      { color: #e67e22 !important; }
+
+/* ── Game field ──────────────────────────────────────────────────────────── */
+.game-field {
+  position: relative;
+  width: 100%;
+  height: 380px;
+  background: linear-gradient(180deg, var(--cream-200) 0%, var(--cream-50) 100%);
+  border: 1px solid var(--forest-100);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  user-select: none;
+  touch-action: manipulation; /* improves mobile tap responsiveness */
+}
+
+@media (max-width: 600px) {
+  .game-field { height: 300px; }
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────── */
+.pop-toast {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--forest-100);
+  border-radius: var(--radius-full);
+  padding: 5px 16px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--forest-800);
+  white-space: nowrap;
+  box-shadow: var(--shadow-sm);
+  z-index: 10;
+  animation: toast-in 0.25s ease;
+  pointer-events: none;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Balloon hitbox (invisible, enlarged click target) ───────────────────── */
+.balloon-hitbox {
+  position: absolute;
+  /* starts entirely below the game field */
+  bottom: -100px;
+  /* centred flex to keep visual balloon in the middle of the larger hitbox */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* float animation applied via inline style */
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  /* no visible background — purely an interaction zone */
+  background: transparent;
+  border-radius: 50%;
+  z-index: 2;
+  /* touch: tell browser this element is tappable */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Float upward — exits through the top of the game field */
+@keyframes balloon-float {
+  0%   { bottom: -100px; }
+  100% { bottom: 115%; }
+}
+
+/* ── Balloon visual ──────────────────────────────────────────────────────── */
+.balloon {
+  position: relative; /* needed for the ::after string */
+  border-radius: 50% 50% 48% 48%; /* slight teardrop shape */
+  flex-shrink: 0;
+  transition: filter 0.1s ease;
+}
+
+/* String */
+.balloon::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1.5px;
+  height: 13px;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 1px;
+}
+
+/* Highlight on hover — applied to hitbox, propagates naturally */
+.balloon-hitbox:hover .balloon {
+  filter: brightness(1.12);
+}
+
+/* Normal — calm forest teal */
+.balloon--normal {
+  background: radial-gradient(circle at 35% 35%, #68d391, #2f855a 80%);
+  box-shadow: 0 4px 14px rgba(47, 133, 90, 0.35);
+}
+
+/* Message — warm amber */
+.balloon--message {
+  background: radial-gradient(circle at 35% 35%, #f6e05e, #c48a00 80%);
+  box-shadow: 0 4px 14px rgba(196, 138, 0, 0.35);
+}
+
+/* Danger — soft coral red; ⚡ icon via ::before */
+.balloon--danger {
+  background: radial-gradient(circle at 35% 35%, #fc8181, #c53030 80%);
+  box-shadow: 0 4px 14px rgba(197, 48, 48, 0.38);
+}
+
+.balloon--danger::before {
+  content: '⚡';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -55%);
+  font-size: 0.72em;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* ── Pop burst animation ─────────────────────────────────────────────────── */
+@keyframes balloon-pop {
+  0%   { transform: scale(1);    opacity: 1; }
+  45%  { transform: scale(1.5);  opacity: 0.65; }
+  100% { transform: scale(0.05); opacity: 0; }
+}
+
+.balloon--popped {
+  pointer-events: none;
+  animation-name: balloon-pop !important;
+  animation-timing-function: ease-out !important;
+  animation-fill-mode: forwards !important;
+}
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+.pop-controls {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.control-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  padding: var(--space-2xs) var(--space-md);
+}
+
+.end-btn { border-color: var(--cream-400); }
+
+/* ── Completion summary ───────────────────────────────────────────────────── */
+.completion-summary-box {
+  background: var(--cream-50);
+  border: 1px solid var(--forest-50);
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  text-align: left;
+}
+
+.summary-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.summary-stat-row strong { color: var(--forest-900); font-weight: 700; }
+
+.completion-actions-row {
+  display: flex;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.retry-btn {
+  flex: 1;
+  border-color: var(--cream-400);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  font-size: var(--fs-xs);
+}
+
+.done-btn {
+  flex: 2;
+  min-height: 38px;
+  font-size: var(--fs-xs);
+}
+
+/* Your Best Stats card */
+.your-best-box {
+  margin-top: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--cream-50);
+  border: 1px solid var(--forest-50);
+  border-radius: var(--radius-lg);
+  text-align: left;
+}
+
+.your-best-box h3 {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--forest-900);
+  margin: 0 0 var(--space-2xs) 0;
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+
+.stats-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-xs);
+}
+
+.stats-list-item span {
+  color: var(--text-muted);
+}
+
+.stats-list-item strong {
+  color: var(--forest-900);
+  font-weight: 700;
+}
+
+.no-stats-msg {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+.stats-loading {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-style: italic;
+  margin: var(--space-md) 0;
+}
+
+.stats-error {
+  font-size: var(--fs-xs);
+  color: #c0392b;
+  margin: var(--space-md) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3xs);
+}
+
+.btn-retry {
+  padding: 2px 8px;
+  font-size: var(--fs-2xs);
+  min-height: 24px;
+}
+
+/* Personal Best Banner */
+.personal-best-banner {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius-lg);
+  padding: var(--space-xs) var(--space-md);
+  margin-bottom: var(--space-md);
+  text-align: center;
+}
+
+.personal-best-banner h4 {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: #b45309;
+  margin: 0 0 2px 0;
+}
+
+.personal-best-banner p {
+  font-size: var(--fs-xs);
+  color: #92400e;
+  margin: 0;
+  font-weight: 600;
+}
+

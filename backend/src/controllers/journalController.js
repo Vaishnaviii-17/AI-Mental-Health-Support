@@ -176,10 +176,50 @@ const deleteJournal = asyncHandler(async (req, res) => {
   res.status(200).json(response.success("Journal entry deleted successfully"));
 });
 
+const getRecentJournals = asyncHandler(async (req, res) => {
+  const userId = req.user.id;
+  const query = `
+    SELECT id, title, content, mood, emotion, insight, created_at AS "date"
+    FROM journals
+    WHERE user_id = $1
+    ORDER BY created_at DESC
+    LIMIT 3;
+  `;
+  const pool = require("../config/db");
+  const { rows } = await pool.query(query, [userId]);
+
+  const journals = rows.map(r => {
+    let dateStr = "Recent";
+    const d = new Date(r.date);
+    if (d.toDateString() === new Date().toDateString()) {
+      dateStr = "Today";
+    } else {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      if (d.toDateString() === yesterday.toDateString()) {
+        dateStr = "Yesterday";
+      } else {
+        dateStr = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" });
+      }
+    }
+
+    return {
+      id: r.id,
+      title: r.title,
+      date: dateStr,
+      mood: r.mood || "📝",
+      preview: r.content.length > 100 ? r.content.slice(0, 100) + "..." : r.content
+    };
+  });
+
+  res.status(200).json(response.success("Recent journals retrieved successfully", journals));
+});
+
 module.exports = {
   getJournals,
   getJournalById,
   createJournal,
   transcribeJournalAudio,
   deleteJournal,
+  getRecentJournals,
 };

@@ -269,14 +269,77 @@ function legacyEmotionSummary(analysis) {
   return summary;
 }
 
+const EMOTION_SCORE_MAP = {
+  // Positive emotions -> 5 or 4
+  joy: 5,
+  excitement: 5,
+  love: 5,
+  pride: 5,
+  relief: 5,
+  amusement: 5,
+  caring: 5,
+  admiration: 5,
+  approval: 4,
+  desire: 4,
+  gratitude: 4,
+  optimism: 4,
+
+  // Neutral emotions -> 3
+  neutral: 3,
+  curiosity: 3,
+  realization: 3,
+  surprise: 3,
+  confusion: 3,
+
+  // Negative emotions -> 2 or 1
+  annoyance: 2,
+  disapproval: 2,
+  embarrassment: 2,
+  nervousness: 2,
+  disgust: 2,
+  anger: 2,
+  sadness: 1,
+  grief: 1,
+  fear: 1,
+  disappointment: 1,
+  remorse: 1,
+};
+
+function emotionToScore(emotion) {
+  if (!emotion) return 3;
+  const cleanEmotion = emotion.toLowerCase().trim();
+  return EMOTION_SCORE_MAP[cleanEmotion] ?? 3;
+}
+
+function scoreToMoodDetails(score) {
+  if (score === null || score === undefined || Number.isNaN(score)) {
+    return { emotion: "Neutral", emoji: "😐" };
+  }
+  const numericScore = Number(score);
+  if (numericScore >= 4.5) {
+    return { emotion: "Very Happy", emoji: "😊" };
+  } else if (numericScore >= 3.5) {
+    return { emotion: "Good", emoji: "🙂" };
+  } else if (numericScore >= 2.5) {
+    return { emotion: "Neutral", emoji: "😐" };
+  } else if (numericScore >= 1.5) {
+    return { emotion: "Sad", emoji: "😔" };
+  } else {
+    return { emotion: "Very Sad", emoji: "😢" };
+  }
+}
+
 module.exports = {
   EMOTION_EMOJI_MAP,
   DEFAULT_EMOTION_EMOJI,
   RISK_CATEGORY_LABELS,
+  EMOTION_SCORE_MAP,
   emotionToEmoji,
   riskCategoryLabel,
   sentimentToScore,
   buildJournalSummary,
   resolveEmotion,
   resolveRisk,
+  emotionToScore,
+  scoreToMoodDetails,
 };

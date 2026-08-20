@@ -79,12 +79,13 @@ function LatestMoodCard({ mood, onUpdate }) {
             No mood recorded today.
           </p>
 
-          <Link
-            to="/mood"
+          <button
+            onClick={() => onUpdate && onUpdate(null)}
             className="btn btn-primary"
+            type="button"
           >
             Check In
-          </Link>
+          </button>
 
         </div>
 
@@ -143,6 +144,21 @@ function LatestMoodCard({ mood, onUpdate }) {
           </p>
         )}
 
+        {/* Combined mood sources checklist */}
+        {mood.sources && (
+          <ul className="dashboard-mood-sources">
+            <li className={mood.sources.checkin ? "source--active" : "source--inactive"}>
+              {mood.sources.checkin ? "✓" : "○"} Mood Check-in
+            </li>
+            <li className={mood.sources.journal ? "source--active" : "source--inactive"}>
+              {mood.sources.journal ? "✓" : "○"} Journal
+            </li>
+            <li className={mood.sources.chat ? "source--active" : "source--inactive"}>
+              {mood.sources.chat ? "✓" : "○"} AI Chat
+            </li>
+          </ul>
+        )}
+
         {mood.note && (
           <div className="dashboard-mood-note">
             <span className="dashboard-mood-note__label">
@@ -175,7 +191,7 @@ function LatestMoodCard({ mood, onUpdate }) {
         </button>
 
         <Link
-          to="/mood/history"
+          to="/analytics#history"
           className="dashboard-text-link"
         >
           <History size={15} />

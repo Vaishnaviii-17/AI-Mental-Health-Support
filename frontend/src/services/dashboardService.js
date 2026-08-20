@@ -1,7 +1,7 @@
 import api from "../lib/axios";
 import { MOCK_DASHBOARD_DATA } from "../components/dashboard/dashboardData";
 
-const useMockData = import.meta.env.VITE_USE_MOCK_DASHBOARD !== "false";
+const useMockData = import.meta.env.VITE_USE_MOCK_DASHBOARD === "true";
 const wait = (duration) => new Promise((resolve) => setTimeout(resolve, duration));
 const authConfig = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
 const getData = (response) => response.data?.data ?? response.data;
