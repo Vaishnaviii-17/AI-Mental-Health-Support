@@ -21,10 +21,6 @@ ALTER COLUMN mood_date SET NOT NULL;
 ALTER TABLE moods
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
--- One manual mood check-in per user per day
-ALTER TABLE moods
-ADD CONSTRAINT moods_user_day_unique
-UNIQUE (user_id, mood_date);
 
 -- Identify where the mood came from.
 -- manual = user daily check-in

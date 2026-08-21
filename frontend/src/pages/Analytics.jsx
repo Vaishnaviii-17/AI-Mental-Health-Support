@@ -11,9 +11,13 @@ import {
   Tooltip,
   Legend
 } from "chart.js";
-import { Smile, Calendar, TrendingUp, CheckCircle2, RefreshCw, ChevronLeft, ChevronRight, BarChart2 } from "lucide-react";
+import { Smile, Calendar, TrendingUp, CheckCircle2, RefreshCw, ChevronLeft, ChevronRight, BarChart2, Activity, Leaf, TreePine, Wind, Sparkles, Brain } from "lucide-react";
+
 import Navbar from "../components/Navbar/Navbar";
 import { getMoodStats, getMoodHistory, getActivityCalendar } from "../services/analyticsService";
+import { getWellnessTime } from "../services/activityService";
+
+
 import "./Analytics.css";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler, Tooltip, Legend);
@@ -26,12 +30,33 @@ function getStoredUser() {
   }
 }
 
+function fmtMins(seconds) {
+  if (!seconds || seconds <= 0) return "0 min";
+  const m = Math.round(seconds / 60);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem === 0 ? `${h}h` : `${h}h ${rem}m`;
+}
+
+function activityLabel(type) {
+  if (type === "pop_stress") return "Pop the Stress";
+  if (type === "memory_match") return "Memory Match";
+  if (type === "breathing_bubble") return "Breathing Bubble";
+  return type || "—";
+}
+
 function AnalyticsPage() {
   const [stats, setStats] = useState(null);
   const [history, setHistory] = useState([]);
   const [activityData, setActivityData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Wellness Time stats (separate from mood analytics)
+  const [wellnessTime, setWellnessTime] = useState(null);
+  const [loadingWellness, setLoadingWellness] = useState(true);
+  const [errorWellness, setErrorWellness] = useState(false);
 
   // History Pagination
   const [historyPage, setHistoryPage] = useState(1);
@@ -60,9 +85,41 @@ function AnalyticsPage() {
     }
   }, []);
 
+  const loadWellnessData = useCallback(async () => {
+    setLoadingWellness(true);
+    setErrorWellness(false);
+    try {
+      const data = await getWellnessTime();
+      setWellnessTime(data);
+    } catch (err) {
+      console.error("Unable to load wellness time stats", err);
+      setErrorWellness(true);
+    } finally {
+      setLoadingWellness(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadAnalytics();
   }, [loadAnalytics]);
+
+  useEffect(() => {
+    loadWellnessData();
+  }, [loadWellnessData]);
+
+
+
+  useEffect(() => {
+    if (!loading && window.location.hash) {
+      const id = window.location.hash.substring(1);
+      setTimeout(() => {
+        const element = document.getElementById(id);
+        if (element) {
+          element.scrollIntoView({ behavior: "smooth" });
+        }
+      }, 200);
+    }
+  }, [loading]);
 
   const formatDate = (dateStr) => {
     try {
@@ -401,10 +458,10 @@ function AnalyticsPage() {
                 </div>
               </section>
 
-              {/* 3. CHARTS ROW */}
+               {/* 3. CHARTS ROW */}
               <section className="analytics-charts-row">
                 {/* Weekly Trend Line Chart */}
-                <article className="dashboard-card analytics-chart-card">
+                <article id="trend" className="dashboard-card analytics-chart-card">
                   <div className="dashboard-card__heading">
                     <div>
                       <span className="eyebrow">Weekly pattern</span>
@@ -417,7 +474,7 @@ function AnalyticsPage() {
                 </article>
 
                 {/* Emotion Distribution Bar Chart */}
-                <article className="dashboard-card analytics-chart-card">
+                <article id="emotion-distribution" className="dashboard-card analytics-chart-card">
                   <div className="dashboard-card__heading">
                     <div>
                       <span className="eyebrow">Emotion Distribution</span>
@@ -431,7 +488,7 @@ function AnalyticsPage() {
               </section>
 
               {/* 4. HISTORY TABLE / LIST */}
-              <section className="analytics-history-section">
+              <section id="history" className="analytics-history-section">
                 <div className="section-block-title-row">
                   <span className="eyebrow">History logs</span>
                   <h2>Recent reflections</h2>
@@ -523,8 +580,199 @@ function AnalyticsPage() {
                   </div>
                 )}
               </section>
+
+              {/* 5. YOUR WELLNESS TIME SECTION */}
+              <section className="analytics-section-block" id="wellness-time">
+                <div className="section-block-title-row">
+                  <span className="eyebrow">Wellness Time</span>
+                  <h2>Your Wellness Time</h2>
+                </div>
+                <p className="analytics-subtitle" style={{ marginBottom: "var(--space-md)" }}>
+                  A calm overview of the time you've intentionally spent through wellness activities.
+                </p>
+
+                {loadingWellness ? (
+                  <div className="analytics-loading-state">
+                    <div className="analytics-spinner" />
+                    <p>Loading wellness time...</p>
+                  </div>
+                ) : errorWellness ? (
+                  <div className="dashboard-card activity-wellness-error">
+                    <p style={{ color: "var(--text-muted)", fontSize: "var(--fs-sm)", marginBottom: "var(--space-xs)" }}>
+                      Unable to load wellness time statistics.
+                    </p>
+                    <button className="btn btn-ghost" onClick={loadWellnessData}>
+                      <RefreshCw size={13} /> Retry
+                    </button>
+                  </div>
+                ) : wellnessTime && wellnessTime.totalMindfulSeconds === 0 ? (
+                  /* Empty state */
+                  <div className="analytics-empty-state dashboard-card compact-card">
+                    <Activity size={36} className="analytics-empty-icon" />
+                    <h2>No mindful activity yet</h2>
+                    <p>Complete your first wellness activity and your progress will appear here.</p>
+                  </div>
+                ) : wellnessTime ? (
+                  <>
+                    {/* Summary Cards */}
+                    <section className="analytics-summary-cards" style={{ marginBottom: "var(--space-md)" }}>
+                      <article className="dashboard-card summary-card-item">
+                        <span className="eyebrow">Total Mindful Time</span>
+                        <div className="summary-card-value-wrap">
+                          <h3 style={{ fontSize: "var(--fs-lg)" }}>{fmtMins(wellnessTime.totalMindfulSeconds)}</h3>
+                          <Wind size={18} className="summary-card-icon mood-trend" />
+                        </div>
+                        <p className="summary-card-description">Time spent on completed activities.</p>
+                      </article>
+
+                      <article className="dashboard-card summary-card-item">
+                        <span className="eyebrow">Today</span>
+                        <div className="summary-card-value-wrap">
+                          <h3 style={{ fontSize: "var(--fs-lg)" }}>{fmtMins(wellnessTime.todayMindfulSeconds)}</h3>
+                          <Activity size={18} className="summary-card-icon mood-check" />
+                        </div>
+                        <p className="summary-card-description">Mindful time logged today.</p>
+                      </article>
+
+                      <article className="dashboard-card summary-card-item">
+                        <span className="eyebrow">This Week</span>
+                        <div className="summary-card-value-wrap">
+                          <h3 style={{ fontSize: "var(--fs-lg)" }}>{fmtMins(wellnessTime.weekMindfulSeconds)}</h3>
+                          <TrendingUp size={18} className="summary-card-icon mood-trend" />
+                        </div>
+                        <p className="summary-card-description">Mindful time logged this week.</p>
+                      </article>
+
+                      <article className="dashboard-card summary-card-item">
+                        <span className="eyebrow">Most Played</span>
+                        <div className="summary-card-value-wrap">
+                          <h3 style={{ fontSize: "var(--fs-sm)" }}>
+                            {wellnessTime.mostPlayedActivity ? activityLabel(wellnessTime.mostPlayedActivity) : "—"}
+                          </h3>
+                          <Sparkles size={18} className="summary-card-icon mood-smile" />
+                        </div>
+                        <p className="summary-card-description">Your most frequently played activity.</p>
+                      </article>
+                    </section>
+
+                    {/* Category breakdown + 7-day chart */}
+                    <section className="analytics-charts-row">
+
+                      {/* How You Spent Your Time */}
+                      <article className="dashboard-card analytics-chart-card">
+                        <div className="dashboard-card__heading">
+                          <div>
+                            <span className="eyebrow">Breakdown</span>
+                            <h2>How you spent your time</h2>
+                          </div>
+                        </div>
+
+                        {/* Category time rows */}
+                        <div className="wellness-category-list">
+                          {[
+                            { label: "Relaxation", key: "relaxation", icon: <Wind size={14} /> },
+                            { label: "Stress Relief", key: "stress_relief", icon: <Sparkles size={14} /> },
+                            { label: "Focus", key: "focus", icon: <Brain size={14} /> },
+                            { label: "Self Reflection", key: "self_reflection", icon: <Leaf size={14} /> },
+                            { label: "Support", key: "support", icon: <CheckCircle2 size={14} /> }
+                          ].map(({ label, key, icon }) => {
+                            const secs = wellnessTime.categoryTime[key] || 0;
+                            const totalSecs = wellnessTime.totalMindfulSeconds || 1;
+                            const pct = Math.round((secs / totalSecs) * 100);
+                            return (
+                              <div key={key} className="wellness-category-row">
+                                <div className="wellness-category-label-row">
+                                  <span className="wellness-cat-icon">{icon}</span>
+                                  <span className="wellness-cat-name">{label}</span>
+                                  <span className="wellness-cat-time">{fmtMins(secs)}</span>
+                                </div>
+                                <div className="wellness-cat-bar-wrapper">
+                                  <div className="wellness-cat-bar" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Activity Breakdown — only activities with recorded time */}
+                        {(() => {
+                          const active = [
+                            wellnessTime.categoryTime.relaxation > 0 && { name: "Breathing Bubble", secs: wellnessTime.categoryTime.relaxation },
+                            wellnessTime.categoryTime.stress_relief > 0 && { name: "Pop the Stress", secs: wellnessTime.categoryTime.stress_relief },
+                            wellnessTime.categoryTime.focus > 0 && { name: "Memory Match", secs: wellnessTime.categoryTime.focus }
+                          ].filter(Boolean);
+
+                          if (active.length === 0) return null;
+                          return (
+                            <div className="wellness-activity-breakdown">
+                              <span className="eyebrow" style={{ display: "block", marginBottom: "var(--space-xs)" }}>Activity breakdown</span>
+                              {active.map(a => (
+                                <div key={a.name} className="wellness-breakdown-row">
+                                  <span>{a.name}</span>
+                                  <strong>{fmtMins(a.secs)}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </article>
+
+                      {/* 7-Day Mindful Time Bar Chart */}
+                      <article className="dashboard-card analytics-chart-card">
+                        <div className="dashboard-card__heading">
+                          <div>
+                            <span className="eyebrow">7-day chart</span>
+                            <h2>Mindful time this week</h2>
+                          </div>
+                        </div>
+                        <div className="chart-canvas-wrapper">
+                          <Bar
+                            data={{
+                              labels: wellnessTime.dailyTime.map(t =>
+                                new Date(t.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })
+                              ),
+                              datasets: [{
+                                data: wellnessTime.dailyTime.map(t => Math.round((t.seconds || 0) / 60)),
+                                backgroundColor: "rgba(27, 67, 50, 0.15)",
+                                borderColor: "#1b4332",
+                                borderWidth: 1.5,
+                                borderRadius: 4
+                              }]
+                            }}
+                            options={{
+                              responsive: true,
+                              maintainAspectRatio: false,
+                              plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                  backgroundColor: "#163d2f",
+                                  bodyFont: { family: "Manrope", size: 11 },
+                                  callbacks: {
+                                    label: ctx => `${ctx.parsed.y} min`
+                                  }
+                                }
+                              },
+                              scales: {
+                                x: { grid: { display: false }, ticks: { color: "#7c8d84", font: { family: "Manrope", size: 10 } } },
+                                y: {
+                                  beginAtZero: true,
+                                  ticks: { stepSize: 1, color: "#7c8d84", font: { size: 10 }, callback: v => `${v}m` },
+                                  grid: { color: "rgba(27, 67, 50, 0.04)" }
+                                }
+                              }
+                            }}
+                          />
+                        </div>
+                      </article>
+                    </section>
+                  </>
+                ) : null}
+              </section>
+
             </div>
+
           )}
+
         </div>
       </main>
     </>

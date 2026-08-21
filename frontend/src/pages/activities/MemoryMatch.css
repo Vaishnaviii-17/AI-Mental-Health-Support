@@ -1,0 +1,437 @@
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.mm-main {
+  display: flex;
+  justify-content: center;
+  padding-bottom: var(--space-lg);
+}
+
+/* ── Intro / Complete panel ──────────────────────────────────────────────── */
+.mm-panel {
+  width: 100%;
+  max-width: 460px;
+  background: var(--cream-100);
+  border: 1px solid var(--forest-100);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-lg) var(--space-xl);
+  text-align: center;
+}
+
+.mm-panel__icon {
+  font-size: 3rem;
+  line-height: 1;
+  margin-bottom: var(--space-sm);
+}
+
+.mm-panel h2 {
+  font-size: 1.85rem;
+  font-weight: 800;
+  color: var(--forest-900);
+  margin-bottom: var(--space-xs);
+}
+
+.mm-panel__subtitle {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.55;
+  margin-bottom: var(--space-md);
+}
+
+/* Reuse helpers shared with PopStress / BreathingBubble */
+.session-info-box {
+  background: var(--cream-50);
+  border: 1px solid var(--forest-50);
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-xs);
+}
+
+.info-label { color: var(--text-muted); font-weight: 500; }
+.info-val   { color: var(--forest-900); font-weight: 700; }
+
+.start-session-btn {
+  width: 100%;
+  padding: var(--space-xs) var(--space-md);
+  font-size: var(--fs-sm);
+}
+
+/* ── Complete panel extra ─────────────────────────────────────────────────── */
+.mm-score-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+  border: 1.5px solid var(--forest-200);
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.mm-score-box__label { font-size: var(--fs-xs); color: var(--forest-700); font-weight: 600; }
+.mm-score-box__value { font-size: 2.4rem; font-weight: 900; color: var(--forest-800); line-height: 1; }
+
+.completion-summary-box {
+  background: var(--cream-50);
+  border: 1px solid var(--forest-50);
+  border-radius: var(--radius-lg);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+  text-align: left;
+}
+
+.summary-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+.summary-stat-row strong { color: var(--forest-900); font-weight: 700; }
+
+.completion-actions-row {
+  display: flex;
+  gap: var(--space-sm);
+  width: 100%;
+}
+
+.retry-btn {
+  flex: 1;
+  border-color: var(--cream-400);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  font-size: var(--fs-xs);
+}
+
+.done-btn {
+  flex: 2;
+  min-height: 38px;
+  font-size: var(--fs-xs);
+}
+
+/* ── Playing layout ──────────────────────────────────────────────────────── */
+.mm-playing {
+  width: 100%;
+  max-width: 540px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* ── Stats bar ───────────────────────────────────────────────────────────── */
+.mm-stats-bar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--cream-100);
+  border: 1px solid var(--forest-100);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xs) var(--space-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.mm-stat           { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+.mm-stat--center   { align-items: center; }
+
+.stat-lbl          { font-size: var(--fs-2xs); color: var(--text-muted); }
+.stat-val          { font-size: var(--fs-lg);  color: var(--forest-900); font-weight: 800; }
+.stat-val--lg      { font-size: 1.25rem; }
+
+/* ── Match message banner ────────────────────────────────────────────────── */
+.mm-msg-row {
+  width: 100%;
+  height: 32px;  /* fixed — prevents grid from jumping when message appears */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mm-msg-text {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--forest-800);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid var(--forest-100);
+  border-radius: var(--radius-full);
+  padding: 4px 14px;
+  box-shadow: var(--shadow-sm);
+  animation: mm-msg-appear 2.8s ease forwards;
+  white-space: nowrap;
+}
+
+@keyframes mm-msg-appear {
+  0%   { opacity: 0; transform: translateY(-5px); }
+  12%  { opacity: 1; transform: translateY(0); }
+  72%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ── Card grid ───────────────────────────────────────────────────────────── */
+.mm-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+@media (max-width: 420px) {
+  .mm-grid { gap: 6px; }
+}
+
+/* ── Card container (perspective host) ───────────────────────────────────── */
+.mm-card {
+  aspect-ratio: 1;
+  cursor: pointer;
+  /* Perspective gives depth to the 3-D flip */
+  perspective: 700px;
+  -webkit-perspective: 700px;
+  border-radius: var(--radius-lg);
+  outline: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mm-card:focus-visible {
+  box-shadow: 0 0 0 3px var(--forest-400);
+}
+
+/* Matched cards are no longer interactive */
+.mm-card--matched {
+  cursor: default;
+}
+
+/* ── Card inner (the element that actually flips) ────────────────────────── */
+.mm-card-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+  transition: transform 0.48s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: var(--radius-lg);
+}
+
+/* Flip state — rotate 180 ° around Y axis */
+.mm-card--flipped .mm-card-inner {
+  transform: rotateY(180deg);
+}
+
+/* Matched state: suppress transition so animation runs cleanly */
+.mm-card--matched .mm-card-inner {
+  transition: none;
+  animation: mm-match-pulse 0.55s ease 0.05s;
+}
+
+@keyframes mm-match-pulse {
+  0%   { transform: rotateY(180deg) scale(1); }
+  45%  { transform: rotateY(180deg) scale(1.07); }
+  100% { transform: rotateY(180deg) scale(1); }
+}
+
+/* ── Card faces (shared) ─────────────────────────────────────────────────── */
+.mm-face {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  /* Each face hides its OWN back when rotated away from viewer */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+}
+
+/* ── Back face (shown by default — faces viewer at 0 °) ─────────────────── */
+.mm-face--back {
+  background: linear-gradient(148deg, var(--forest-500) 0%, var(--forest-800) 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+.mm-back-mark {
+  color: rgba(255, 255, 255, 0.30);
+  font-size: clamp(1.1rem, 3.5vw, 1.6rem);
+  line-height: 1;
+}
+
+/* Subtle shine overlay on back */
+.mm-face--back::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 60%);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* ── Front face (pre-rotated 180 °, becomes visible after flip) ──────────── */
+.mm-face--front {
+  /*
+   * Pre-rotate so this face is hidden initially.
+   * After the inner div rotates 180 °, this face sits at 360 ° = facing viewer.
+   */
+  transform: rotateY(180deg);
+  background: var(--cream-50);
+  border: 1.5px solid var(--forest-100);
+  gap: 5px;
+}
+
+/* Matched front face — soft green tint */
+.mm-card--matched .mm-face--front {
+  background: #f0fdf4;
+  border-color: var(--forest-200);
+}
+
+/* ── Card content ────────────────────────────────────────────────────────── */
+.mm-emoji {
+  font-size: clamp(1.4rem, 5vw, 2rem);
+  line-height: 1;
+  display: block;
+}
+
+.mm-label {
+  font-size: clamp(0.52rem, 1.8vw, 0.68rem);
+  font-weight: 700;
+  color: var(--forest-700);
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+/* Matched label — slightly muted */
+.mm-card--matched .mm-label { color: var(--forest-500); }
+
+/* Hover glow on un-matched face-down cards */
+.mm-card:not(.mm-card--matched):not(.mm-card--flipped):hover .mm-face--back {
+  background: linear-gradient(148deg, var(--forest-400) 0%, var(--forest-700) 100%);
+}
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+.mm-controls {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.control-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  padding: var(--space-2xs) var(--space-md);
+  border-color: var(--cream-400);
+}
+
+/* Your Best Stats card */
+.your-best-box {
+  margin-top: var(--space-md);
+  margin-bottom: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--cream-50);
+  border: 1px solid var(--forest-50);
+  border-radius: var(--radius-lg);
+  text-align: left;
+}
+
+.your-best-box h3 {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--forest-900);
+  margin: 0 0 var(--space-2xs) 0;
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+
+.stats-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--fs-xs);
+}
+
+.stats-list-item span {
+  color: var(--text-muted);
+}
+
+.stats-list-item strong {
+  color: var(--forest-900);
+  font-weight: 700;
+}
+
+.no-stats-msg {
+  font-size: var(--fs-2xs);
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+.stats-loading {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-style: italic;
+  margin: var(--space-md) 0;
+}
+
+.stats-error {
+  font-size: var(--fs-xs);
+  color: #c0392b;
+  margin: var(--space-md) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3xs);
+}
+
+.btn-retry {
+  padding: 2px 8px;
+  font-size: var(--fs-2xs);
+  min-height: 24px;
+}
+
+/* Personal Best Banner */
+.personal-best-banner {
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  border: 1px solid #f59e0b;
+  border-radius: var(--radius-lg);
+  padding: var(--space-xs) var(--space-md);
+  margin-bottom: var(--space-md);
+  text-align: center;
+}
+
+.personal-best-banner h4 {
+  font-size: var(--fs-sm);
+  font-weight: 800;
+  color: #b45309;
+  margin: 0 0 2px 0;
+}
+
+.personal-best-banner p {
+  font-size: var(--fs-xs);
+  color: #92400e;
+  margin: 0;
+  font-weight: 600;
+}
+

@@ -9,6 +9,10 @@ import ChatPage from "./pages/Chat";
 import ProfilePage from "./pages/Profile";
 import AnalyticsPage from "./pages/Analytics";
 import FocusTimerPage from "./pages/FocusTimer";
+import ActivitiesPage from "./pages/Activities";
+import BreathingBubble from "./pages/activities/BreathingBubble";
+import PopStress from "./pages/activities/PopStress";
+import MemoryMatch from "./pages/activities/MemoryMatch";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./styles/global.css";
 
@@ -66,6 +70,38 @@ function App() {
         element={
           <ProtectedRoute>
             <FocusTimerPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities"
+        element={
+          <ProtectedRoute>
+            <ActivitiesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/breathing"
+        element={
+          <ProtectedRoute>
+            <BreathingBubble />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/pop-stress"
+        element={
+          <ProtectedRoute>
+            <PopStress />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/memory-match"
+        element={
+          <ProtectedRoute>
+            <MemoryMatch />
           </ProtectedRoute>
         }
       />

@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from "chart.js";
 import { ArrowUpRight, RefreshCw } from "lucide-react";
+import { Link } from "react-router-dom";
 import { getMoodStats } from "../../services/analyticsService";
 
 ChartJS.register(
@@ -157,13 +158,13 @@ function MoodChart() {
           <h2 id="weekly-mood-title">Weekly mood</h2>
         </div>
 
-        <a
-          href="#today-mood"
+        <Link
+          to="/analytics#trend"
           className="dashboard-icon-link"
           aria-label="View mood history"
         >
           <ArrowUpRight size={18} aria-hidden="true" />
-        </a>
+        </Link>
       </div>
 
       <div className="dashboard-chart__stats">
@@ -212,9 +213,9 @@ function MoodChart() {
         )}
       </div>
 
-      <a href="#today-mood" className="dashboard-text-link">
+      <Link to="/analytics#trend" className="dashboard-text-link">
         View history <ArrowUpRight size={14} aria-hidden="true" />
-      </a>
+      </Link>
     </article>
   );
 }
