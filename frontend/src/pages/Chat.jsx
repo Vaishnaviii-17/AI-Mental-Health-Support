@@ -1,7 +1,25 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { Send, Trash2, ShieldAlert, Sparkles, MessageSquareHeart, Plus, Menu } from "lucide-react";
+import {
+  Send,
+  Trash2,
+  ShieldAlert,
+  Sparkles,
+  MessageSquareHeart,
+  Plus,
+  Menu,
+  Mic,
+  Square,
+  Loader2,
+  CheckCircle,
+} from "lucide-react";
 import Navbar from "../components/Navbar/Navbar";
-import { getChatHistory, sendMessage, clearChat, deleteSession } from "../services/chatService";
+import {
+  getChatHistory,
+  sendMessage,
+  transcribeChatAudio,
+  clearChat,
+  deleteSession,
+} from "../services/chatService";
 import "./Chat.css";
 
 function getStoredUser() {
@@ -12,11 +30,35 @@ function getStoredUser() {
   }
 }
 
+function appendTranscript(existingText, transcriptText) {
+  const transcript = transcriptText.trim();
+
+  if (!transcript) return existingText;
+
+  const existing = existingText.trimEnd();
+
+  if (!existing) return transcript;
+
+  return `${existing} ${transcript}`;
+}
+
+const VOICE_STATUS_LABELS = {
+  idle: "Speak",
+  recording: "Listening...",
+  processing: "Converting speech...",
+  success: "Transcribed",
+  error: "Speak",
+};
+
+const MAX_RECORDING_MS = 2 * 60 * 1000;
+
 function ChatPage() {
   const [allMessages, setAllMessages] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [inputText, setInputText] = useState("");
+  const [voiceStatus, setVoiceStatus] = useState("idle");
+  const [voiceError, setVoiceError] = useState("");
   
   // Loading & UI states
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -26,6 +68,14 @@ function ChatPage() {
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const mediaStreamRef = useRef(null);
+  const recordingTimeoutRef = useRef(null);
+  const successTimeoutRef = useRef(null);
+  const recordingStartPendingRef = useRef(false);
+  const recordingFailedRef = useRef(false);
+  const isUnmountingRef = useRef(false);
   const storedUser = getStoredUser();
 
   // Dynamic grouping logic: takes all messages and groups them by session_id
@@ -123,6 +173,31 @@ function ChatPage() {
     loadHistory();
   }, []);
 
+  useEffect(() => {
+    isUnmountingRef.current = false;
+
+    return () => {
+      isUnmountingRef.current = true;
+
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
+      }
+
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+        successTimeoutRef.current = null;
+      }
+
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+
+      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    };
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -142,7 +217,14 @@ function ChatPage() {
   const handleSend = async (e) => {
     if (e) e.preventDefault();
     const message = inputText.trim();
-    if (!message || sending) return;
+    if (
+      !message ||
+      sending ||
+      voiceStatus === "recording" ||
+      voiceStatus === "processing"
+    ) {
+      return;
+    }
 
     setInputText("");
     setSending(true);
@@ -201,6 +283,184 @@ function ChatPage() {
       setAllMessages((prev) => prev.filter((m) => m.id !== tempMsgId));
     } finally {
       setSending(false);
+    }
+  };
+
+  const stopRecordingTracks = () => {
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+  };
+
+  const processRecording = async () => {
+    const chunks = audioChunksRef.current;
+    audioChunksRef.current = [];
+
+    if (!chunks.length) {
+      setVoiceStatus("error");
+      setVoiceError("No speech was detected. Please try again.");
+      return;
+    }
+
+    const audioBlob = new Blob(chunks, {
+      type: chunks[0]?.type || "audio/webm",
+    });
+
+    if (audioBlob.size <= 0) {
+      setVoiceStatus("error");
+      setVoiceError("No speech was detected. Please try again.");
+      return;
+    }
+
+    setVoiceStatus("processing");
+    setVoiceError("");
+
+    try {
+      const transcript = await transcribeChatAudio(audioBlob);
+      const text = transcript?.text?.trim();
+
+      if (!text) {
+        setVoiceStatus("error");
+        setVoiceError("No speech was detected. Please try again.");
+        return;
+      }
+
+      setInputText((prev) => appendTranscript(prev, text));
+      setVoiceStatus("success");
+      textareaRef.current?.focus();
+
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
+
+      successTimeoutRef.current = window.setTimeout(() => {
+        setVoiceStatus((current) => (current === "success" ? "idle" : current));
+        successTimeoutRef.current = null;
+      }, 2500);
+    } catch (err) {
+      console.error("Chat transcription failed:", err);
+
+      const status = err.response?.status;
+      const serverMessage =
+        err.response?.data?.message || err.response?.data?.error || "";
+
+      setVoiceStatus("error");
+
+      if (status === 413) {
+        setVoiceError("Recording is too large. Please record a shorter message.");
+      } else if (status === 422 || /empty transcript|No speech/i.test(serverMessage)) {
+        setVoiceError("No speech was detected. Please try again.");
+      } else if (status === 400) {
+        setVoiceError("Unable to convert your speech. Please try again.");
+      } else if (!err.response) {
+        setVoiceError("Unable to connect to the transcription service. Please try again.");
+      } else {
+        setVoiceError("Unable to convert your speech. Please try again.");
+      }
+    }
+  };
+
+  const handleVoiceToggle = async () => {
+    if (voiceStatus === "recording") {
+      if (recordingTimeoutRef.current) {
+        clearTimeout(recordingTimeoutRef.current);
+        recordingTimeoutRef.current = null;
+      }
+
+      if (mediaRecorderRef.current?.state === "recording") {
+        mediaRecorderRef.current.stop();
+      }
+      return;
+    }
+
+    if (
+      voiceStatus === "processing" ||
+      sending ||
+      loadingHistory ||
+      recordingStartPendingRef.current
+    ) {
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setVoiceStatus("error");
+      setVoiceError(
+        "Voice input is not supported in this browser. Please type your message instead."
+      );
+      return;
+    }
+
+    try {
+      recordingStartPendingRef.current = true;
+      recordingFailedRef.current = false;
+      setVoiceError("");
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
+
+      mediaStreamRef.current = stream;
+
+      let recorderOptions;
+
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        recorderOptions = { mimeType: "audio/webm;codecs=opus" };
+      } else if (MediaRecorder.isTypeSupported("audio/webm")) {
+        recorderOptions = { mimeType: "audio/webm" };
+      }
+
+      const recorder = new MediaRecorder(stream, recorderOptions);
+
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data?.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        recordingFailedRef.current = true;
+        setVoiceStatus("error");
+        setVoiceError("An error occurred while recording. Please try again.");
+        stopRecordingTracks();
+      };
+
+      recorder.onstop = async () => {
+        if (recordingTimeoutRef.current) {
+          clearTimeout(recordingTimeoutRef.current);
+          recordingTimeoutRef.current = null;
+        }
+
+        stopRecordingTracks();
+
+        if (isUnmountingRef.current) return;
+        if (recordingFailedRef.current) return;
+
+        await processRecording();
+      };
+
+      mediaRecorderRef.current = recorder;
+
+      recorder.start();
+      recordingStartPendingRef.current = false;
+      setVoiceStatus("recording");
+
+      recordingTimeoutRef.current = window.setTimeout(() => {
+        if (mediaRecorderRef.current?.state === "recording") {
+          mediaRecorderRef.current.stop();
+        }
+      }, MAX_RECORDING_MS);
+    } catch (err) {
+      recordingStartPendingRef.current = false;
+      stopRecordingTracks();
+
+      setVoiceStatus("error");
+      setVoiceError(
+        err?.name === "NotAllowedError" ||
+          err?.name === "PermissionDeniedError"
+          ? "Microphone permission was denied. Please allow microphone access or type your message instead."
+          : "Unable to access your microphone. Please try again or type your message instead."
+      );
     }
   };
 
@@ -266,6 +526,9 @@ function ChatPage() {
   };
 
   const activeMessages = allMessages.filter(m => m.session_id === activeSessionId);
+  const isVoiceBusy =
+    voiceStatus === "recording" ||
+    voiceStatus === "processing";
 
   // Render a single category section inside the sidebar history list
   const renderCategory = (title, categorySessions) => {
@@ -484,7 +747,13 @@ function ChatPage() {
                   <div className="chat-composer-container">
                     <textarea
                       ref={textareaRef}
-                      placeholder={sending ? "MindEase is reflecting..." : "Type your message here..."}
+                      placeholder={
+                        sending
+                          ? "MindEase is reflecting..."
+                          : voiceStatus === "processing"
+                            ? "Converting speech..."
+                            : "Type your message here..."
+                      }
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
                       onKeyDown={handleKeyDown}
@@ -495,14 +764,51 @@ function ChatPage() {
                       required
                     />
                     <button
+                      type="button"
+                      className={`chat-voice-btn chat-voice-btn--${voiceStatus}`}
+                      onClick={handleVoiceToggle}
+                      disabled={sending || loadingHistory || voiceStatus === "processing"}
+                      aria-label={
+                        voiceStatus === "recording"
+                          ? "Stop recording"
+                          : "Start voice input"
+                      }
+                      title={
+                        voiceStatus === "recording"
+                          ? "Stop recording"
+                          : "Start voice input"
+                      }
+                    >
+                      {voiceStatus === "recording" ? (
+                        <Square size={14} />
+                      ) : voiceStatus === "processing" ? (
+                        <Loader2 size={14} className="chat-voice-spin" />
+                      ) : voiceStatus === "success" ? (
+                        <CheckCircle size={14} />
+                      ) : (
+                        <Mic size={14} />
+                      )}
+                      <span>{VOICE_STATUS_LABELS[voiceStatus]}</span>
+                    </button>
+                    <button
                       type="submit"
                       className="chat-submit-btn"
-                      disabled={sending || !inputText.trim() || loadingHistory}
+                      disabled={sending || isVoiceBusy || !inputText.trim() || loadingHistory}
                       aria-label="Send message"
                     >
                       <Send size={15} />
                     </button>
                   </div>
+                  {voiceError && (
+                    <p className="chat-voice-message chat-voice-message--error">
+                      {voiceError}
+                    </p>
+                  )}
+                  {voiceStatus === "processing" && (
+                    <p className="chat-voice-message">
+                      Converting speech to editable chat text...
+                    </p>
+                  )}
                 </form>
               </div>
             </div>

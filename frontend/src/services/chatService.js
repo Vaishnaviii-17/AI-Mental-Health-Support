@@ -16,6 +16,20 @@ export const sendMessage = async (message, sessionId) => {
   return response.data?.data ?? response.data;
 };
 
+export const transcribeChatAudio = async (audioBlob) => {
+  const formData = new FormData();
+  formData.append("audio", audioBlob, "chat-audio.webm");
+
+  const response = await api.post("/chat/transcribe", formData, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data?.data ?? response.data;
+};
+
 export const clearChat = async () => {
   const response = await api.delete("/chat/clear", authConfig());
   return response.data?.data ?? response.data;
