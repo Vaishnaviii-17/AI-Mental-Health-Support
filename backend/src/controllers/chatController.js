@@ -1,5 +1,7 @@
 const chatModel = require("../models/chatModel");
 const geminiService = require("../services/geminiService");
+const inferenceService = require("../services/inferenceService");
+const { resolveEmotion, sentimentToScore } = require("../utils/mlMapping");
 const response = require("../utils/response");
 const asyncHandler = require("../utils/asyncHandler");
 
@@ -32,12 +34,27 @@ const sendMessage = asyncHandler(async (req, res) => {
   // 2. Call the Gemini service to analyze the prompt and generate an empathetic response
   const aiResponse = await geminiService.generateChatResponse(contextHistory, message.trim());
 
-  // 3. Save the user message to PostgreSQL
+  // 3. Save the user message to PostgreSQL (with GoEmotions analysis)
+  let userEmotion = null;
+  let userScore = null;
+  try {
+    const analysis = await inferenceService.analyzeText(message.trim());
+    const resolvedEmotion = resolveEmotion(analysis);
+    userEmotion = resolvedEmotion.emotion || "neutral";
+    userScore = sentimentToScore(analysis.sentiment?.scores) || 3;
+  } catch (err) {
+    console.error("Chat message emotion analysis failed:", err.message);
+    userEmotion = "neutral";
+    userScore = 3;
+  }
+
   const savedUserMsg = await chatModel.addMessage(req.user.id, {
     sender: "user",
     message: message.trim(),
     isCrisis: false,
     sessionId: sessionId || null,
+    emotion: userEmotion,
+    score: userScore,
   });
 
   // Use the session_id from the user's saved message to make sure AI message matches

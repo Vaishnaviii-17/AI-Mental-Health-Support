@@ -1,4 +1,6 @@
 const pool = require("../config/db");
+const combinedMoodService = require("../services/combinedMoodService");
+const { emotionToEmoji } = require("../utils/mlMapping");
 
 /**
  * Log a new mood.
@@ -89,6 +91,22 @@ async function getTodayMood(userId) {
   const { rows } = await pool.query(query, [userId]);
 
   return rows[0] || null;
+}
+
+/**
+ * Get all today's moods for a user.
+ */
+async function getTodayMoods(userId) {
+  const query = `
+    SELECT *
+    FROM moods
+    WHERE user_id = $1
+      AND mood_date = CURRENT_DATE
+    ORDER BY created_at ASC;
+  `;
+
+  const { rows } = await pool.query(query, [userId]);
+  return rows;
 }
 
 /**
@@ -198,12 +216,12 @@ async function updateTodayMood(
 }
 
 /**
- * Fetch mood history for a user.
+ * Fetch mood history for a user across manual check-ins, journals, and chats.
  */
 async function getMoodHistory(userId) {
   const query = `
     SELECT
-      id,
+      id::text,
       emoji AS mood,
       emotion,
       score,
@@ -213,147 +231,193 @@ async function getMoodHistory(userId) {
       created_at AS "date"
     FROM moods
     WHERE user_id = $1
-    ORDER BY created_at DESC;
+
+    UNION ALL
+
+    SELECT
+      id::text,
+      mood AS mood,
+      emotion,
+      sentiment_score AS score,
+      insight,
+      NULL AS note,
+      'journal' AS source,
+      created_at AS "date"
+    FROM journals
+    WHERE user_id = $1
+
+    UNION ALL
+
+    SELECT
+      id::text,
+      NULL AS mood,
+      emotion,
+      score,
+      NULL AS insight,
+      NULL AS note,
+      'chat' AS source,
+      created_at AS "date"
+    FROM chats
+    WHERE user_id = $1 AND sender = 'user' AND emotion IS NOT NULL
+
+    ORDER BY "date" DESC;
   `;
 
   const { rows } = await pool.query(query, [userId]);
 
-  return rows;
+  function formatEmotionLabel(label) {
+    if (!label) return "Neutral";
+    const clean = label.trim();
+    if (clean.toLowerCase() === "neutral") return "Neutral";
+    return clean.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+  }
+
+  return rows.map(row => {
+    row.emotion = formatEmotionLabel(row.emotion);
+    if (!row.mood && row.emotion) {
+      row.mood = emotionToEmoji(row.emotion.toLowerCase());
+    }
+    return row;
+  });
 }
 
 /**
- * Calculate aggregate mood analytics for a user
+ * Calculate aggregate mood analytics for a user based on daily combined mood scores and activities.
  */
 async function getMoodStats(userId) {
-  // 1. Get average mood score
-  const avgRes = await pool.query(
+  // Title case helper for emotions
+  function formatEmotionLabel(label) {
+    if (!label) return "Neutral";
+    const clean = label.trim();
+    if (clean.toLowerCase() === "neutral") return "Neutral";
+    return clean.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(' ');
+  }
+
+  // 1. Fetch all distinct active dates across moods, journals, and chats
+  const activeDatesRes = await pool.query(
     `
-      SELECT
-        ROUND(AVG(score)::numeric, 1)::float AS avg_score
-      FROM moods
-      WHERE user_id = $1
+      SELECT DISTINCT date_str FROM (
+        SELECT mood_date::text AS date_str FROM moods WHERE user_id = $1
+        UNION
+        SELECT created_at::date::text AS date_str FROM journals WHERE user_id = $1
+        UNION
+        SELECT created_at::date::text AS date_str FROM chats WHERE user_id = $1 AND sender = 'user' AND emotion IS NOT NULL
+      ) active_days
+      ORDER BY date_str ASC;
     `,
     [userId]
   );
 
-  const avgScore = avgRes.rows[0]?.avg_score || 0;
+  const activeDates = activeDatesRes.rows.map(r => r.date_str);
 
-  // 2. Get most common emotion
+  // 2. Fetch daily combined mood scores for all active dates
+  const dailyCombinedMoods = [];
+  for (const dateStr of activeDates) {
+    const combined = await combinedMoodService.getCombinedMoodForDate(userId, dateStr);
+    if (combined) {
+      dailyCombinedMoods.push({
+        dateStr,
+        score: combined.score,
+        emotion: combined.emotion
+      });
+    }
+  }
+
+  // Calculate Average Mood Score
+  let avgScore = 0;
+  if (dailyCombinedMoods.length > 0) {
+    const sum = dailyCombinedMoods.reduce((acc, m) => acc + m.score, 0);
+    avgScore = Math.round((sum / dailyCombinedMoods.length) * 10) / 10;
+  }
+
+  // 3. Get most common emotion from all raw activities across the three tables
   const commonRes = await pool.query(
     `
-      SELECT emotion, COUNT(*) AS cnt
-      FROM moods
-      WHERE user_id = $1
+      SELECT emotion, COUNT(*)::int AS cnt
+      FROM (
+        SELECT emotion FROM moods WHERE user_id = $1 AND emotion IS NOT NULL
+        UNION ALL
+        SELECT emotion FROM journals WHERE user_id = $1 AND emotion IS NOT NULL
+        UNION ALL
+        SELECT emotion FROM chats WHERE user_id = $1 AND sender = 'user' AND emotion IS NOT NULL
+      ) all_emotions
       GROUP BY emotion
       ORDER BY cnt DESC, emotion ASC
-      LIMIT 1
+      LIMIT 1;
     `,
     [userId]
   );
 
-  const mostCommon =
-    commonRes.rows[0]?.emotion || "None";
+  const mostCommon = commonRes.rows[0]?.emotion
+    ? formatEmotionLabel(commonRes.rows[0].emotion)
+    : "Neutral";
 
-  // 3. Total mood check-ins
+  // 4. Total manual mood check-ins
   const countRes = await pool.query(
     `
       SELECT COUNT(*)::int AS total_count
       FROM moods
-      WHERE user_id = $1
+      WHERE user_id = $1 AND source = 'manual'
     `,
     [userId]
   );
 
-  const checkinsCount =
-    countRes.rows[0]?.total_count || 0;
+  const checkinsCount = countRes.rows[0]?.total_count || 0;
 
-  // 4. Last 7 check-ins
-  const weeklyRes = await pool.query(
-    `
-      SELECT score, created_at
-      FROM moods
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-      LIMIT 7
-    `,
-    [userId]
-  );
+  // 5. Last 7 calendar days' combined scores (including today)
+  const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weeklyScores = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    // Get local date string YYYY-MM-DD
+    const offset = d.getTimezoneOffset();
+    const localDate = new Date(d.getTime() - (offset * 60 * 1000));
+    const dateStr = localDate.toISOString().split('T')[0];
 
-  const daysOfWeek = [
-    "Sun",
-    "Mon",
-    "Tue",
-    "Wed",
-    "Thu",
-    "Fri",
-    "Sat",
-  ];
+    const label = i === 0 ? "Today" : daysOfWeek[d.getDay()];
 
-  const weeklyScores = weeklyRes.rows
-    .reverse()
-    .map((m, idx, arr) => {
-      const d = new Date(m.created_at);
+    const dayCombined = await combinedMoodService.getCombinedMoodForDate(userId, dateStr);
+    if (dayCombined) {
+      weeklyScores.push({ label, score: dayCombined.score });
+    } else {
+      weeklyScores.push({ label }); // Omit score key completely
+    }
+  }
 
-      const label =
-        idx === arr.length - 1 &&
-        d.toDateString() === new Date().toDateString()
-          ? "Today"
-          : daysOfWeek[d.getDay()];
-
-      return {
-        label,
-        score: m.score,
-      };
-    });
-
-  // 5. Emotion distribution
+  // 6. Emotion distribution from all raw activities
   const distRes = await pool.query(
     `
       SELECT emotion, COUNT(*)::int AS count
-      FROM moods
-      WHERE user_id = $1
-      GROUP BY emotion
+      FROM (
+        SELECT emotion FROM moods WHERE user_id = $1 AND emotion IS NOT NULL
+        UNION ALL
+        SELECT emotion FROM journals WHERE user_id = $1 AND emotion IS NOT NULL
+        UNION ALL
+        SELECT emotion FROM chats WHERE user_id = $1 AND sender = 'user' AND emotion IS NOT NULL
+      ) all_emotions
+      GROUP BY emotion;
     `,
     [userId]
   );
 
   const emotionDistribution = {};
-
   distRes.rows.forEach((row) => {
-    emotionDistribution[row.emotion] = row.count;
+    const key = formatEmotionLabel(row.emotion);
+    emotionDistribution[key] = (emotionDistribution[key] || 0) + row.count;
   });
 
-  // 6. Trend
-  const trendRes = await pool.query(
-    `
-      SELECT score
-      FROM moods
-      WHERE user_id = $1
-      ORDER BY created_at DESC
-      LIMIT 14
-    `,
-    [userId]
-  );
-
+  // 7. Wellness Trend
   let trend = "Stable";
+  if (dailyCombinedMoods.length >= 2) {
+    const scores = dailyCombinedMoods.map(m => m.score);
+    const mid = Math.floor(scores.length / 2);
+    const firstHalf = scores.slice(0, mid);
+    const secondHalf = scores.slice(mid);
 
-  if (trendRes.rows.length >= 2) {
-    const scores = trendRes.rows.map((row) => row.score);
-
-    const thisWeekScores = scores.slice(0, 7);
-    const prevWeekScores = scores.slice(7);
-
-    const thisWeekAvg =
-      thisWeekScores.reduce((a, b) => a + b, 0) /
-      thisWeekScores.length;
-
-    const prevWeekAvg =
-      prevWeekScores.length > 0
-        ? prevWeekScores.reduce((a, b) => a + b, 0) /
-          prevWeekScores.length
-        : thisWeekAvg;
-
-    const diff = thisWeekAvg - prevWeekAvg;
+    const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length;
+    const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length;
+    const diff = secondAvg - firstAvg;
 
     if (diff > 0.2) {
       trend = "Improving";
@@ -422,12 +486,69 @@ async function getActivityCalendar(userId) {
   return rows;
 }
 
+/**
+ * Calculate the user's daily check-in streak dynamically.
+ */
+async function getStreak(userId) {
+  const query = `
+    SELECT DISTINCT mood_date::text AS mood_date
+    FROM moods
+    WHERE user_id = $1 AND source = 'manual'
+    ORDER BY mood_date::text DESC;
+  `;
+  const { rows } = await pool.query(query, [userId]);
+  const dateStrings = rows.map(r => r.mood_date);
+
+  if (dateStrings.length === 0) {
+    return 0;
+  }
+
+  const getLocalDateString = (date) => {
+    const offset = date.getTimezoneOffset();
+    const localDate = new Date(date.getTime() - (offset * 60 * 1000));
+    return localDate.toISOString().split('T')[0];
+  };
+
+  const todayStr = getLocalDateString(new Date());
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = getLocalDateString(yesterday);
+
+  let currentStreak = 0;
+  let checkDateStr = todayStr;
+
+  if (dateStrings.includes(todayStr)) {
+    currentStreak = 1;
+    checkDateStr = todayStr;
+  } else if (dateStrings.includes(yesterdayStr)) {
+    currentStreak = 1;
+    checkDateStr = yesterdayStr;
+  } else {
+    return 0;
+  }
+
+  const nextDate = new Date(checkDateStr);
+  while (true) {
+    nextDate.setDate(nextDate.getDate() - 1);
+    const nextDateStr = getLocalDateString(nextDate);
+    if (dateStrings.includes(nextDateStr)) {
+      currentStreak++;
+    } else {
+      break;
+    }
+  }
+
+  return currentStreak;
+}
+
 module.exports = {
   createMood,
   getTodayMood,
+  getTodayMoods,
   createDailyMood,
   updateTodayMood,
   getMoodHistory,
   getMoodStats,
   getActivityCalendar,
+  getStreak,
 };

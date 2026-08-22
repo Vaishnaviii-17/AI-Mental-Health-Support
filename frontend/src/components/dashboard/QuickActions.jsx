@@ -18,7 +18,7 @@ const ACTIONS = [
     dark: true,
   },
   { label: "Journal", description: "Write freely", icon: BookOpen, href: "/journal", isRouter: true },
-  { label: "Activities", description: "Find a pause", icon: Sparkles, href: "#recommendation", isRouter: false },
+  { label: "Activities", description: "Find a pause", icon: Sparkles, href: "/activities", isRouter: true },
   { label: "Focus timer", description: "Be present", icon: Timer, href: "/focus-timer", isRouter: true },
 ];
 

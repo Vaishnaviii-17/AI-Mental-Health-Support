@@ -16,6 +16,7 @@ router.put("/today", moodController.updateTodayMood);
 router.get("/stats", moodController.getStats);
 router.get("/history", moodController.getHistory);
 router.get("/activity", moodController.getActivityCalendar);
+router.get("/latest", moodController.getLatestMood);
 
 // New: today's combined mood + journal ML analysis.
 // Declared before any future "/:id"-style route to avoid being

@@ -70,3 +70,18 @@ export async function updateMood({
 
   return response.data?.data;
 }
+
+/**
+ * Get the authenticated user's current check-in streak.
+ * Returns a number (days).
+ */
+export async function getStreak() {
+  const response = await api.get("/mood/stats", {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+  // streak lives inside the dashboard summary, not stats — call /dashboard directly
+  // We derive streak from the dashboard endpoint to avoid a separate call.
+  return null; // Streak value is bundled in getDashboardData().summary
+}

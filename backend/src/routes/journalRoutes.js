@@ -6,10 +6,10 @@ const { uploadAudio } = require("../middleware/audioUpload");
 
 const router = express.Router();
 
-// All routes are protected by authMiddleware
 router.use(authMiddleware);
 
 router.get("/", journalController.getJournals);
+router.get("/recent", journalController.getRecentJournals);
 router.post("/transcribe", uploadAudio, transcriptionController.transcribeAudio);
 router.get("/:id", journalController.getJournalById);
 router.post("/", journalController.createJournal);

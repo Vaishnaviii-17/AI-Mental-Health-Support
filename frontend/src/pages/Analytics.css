@@ -505,3 +505,206 @@
 @keyframes analyticsSpin {
   to { transform: rotate(360deg); }
 }
+
+/* ========================
+   Activity & Wellness Section
+   ======================== */
+
+.activity-wellness-error {
+  padding: var(--space-md);
+}
+
+.no-stats-msg {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+}
+
+/* Activity Distribution CSS Bars */
+.activity-dist-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+}
+
+.activity-dist-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.activity-dist-label {
+  width: 130px;
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--forest-800);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-dist-bar-wrapper {
+  flex-grow: 1;
+  height: 12px;
+  background: var(--cream-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.activity-dist-bar {
+  height: 100%;
+  background: var(--forest-500);
+  border-radius: inherit;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  min-width: 4px;
+}
+
+.activity-dist-count {
+  width: 24px;
+  text-align: right;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--forest-900);
+  flex-shrink: 0;
+}
+
+/* Feedback Summary Card */
+.activity-feedback-summary-card {
+  margin-top: var(--space-md);
+}
+
+.activity-feedback-summary-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: var(--space-sm);
+}
+
+.activity-feedback-rating-val {
+  font-size: var(--fs-2xl);
+  font-weight: 800;
+  color: var(--forest-900);
+  line-height: 1;
+}
+
+.activity-feedback-rating-count {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+}
+
+/* ========================
+   Your Wellness Time Section
+   ======================== */
+
+.wellness-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.wellness-category-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wellness-category-label-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.wellness-cat-icon {
+  display: flex;
+  align-items: center;
+  color: var(--forest-600);
+  flex-shrink: 0;
+}
+
+.wellness-cat-name {
+  flex-grow: 1;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--forest-800);
+}
+
+.wellness-cat-time {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--forest-900);
+  flex-shrink: 0;
+}
+
+.wellness-cat-bar-wrapper {
+  height: 8px;
+  background: var(--cream-200);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.wellness-cat-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--forest-400), var(--forest-600));
+  border-radius: inherit;
+  transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  min-width: 3px;
+}
+
+.wellness-activity-breakdown {
+  margin-top: var(--space-md);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--cream-300);
+}
+
+.wellness-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  font-size: var(--fs-xs);
+  color: var(--forest-800);
+  border-bottom: 1px solid var(--cream-200);
+}
+
+.wellness-breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.wellness-breakdown-row strong {
+  color: var(--forest-900);
+  font-weight: 700;
+}
+
+/* Analytics empty state (reuse) */
+.analytics-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-md);
+  text-align: center;
+}
+
+.analytics-empty-icon {
+  color: var(--forest-400);
+  opacity: 0.7;
+}
+
+.analytics-empty-state h2 {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--forest-900);
+  margin: 0;
+}
+
+.analytics-empty-state p {
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  max-width: 300px;
+  margin: 0;
+}
