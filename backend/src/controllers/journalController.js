@@ -1,6 +1,5 @@
 const journalModel = require("../models/journalModel");
 const inferenceService = require("../services/inferenceService");
-const transcriptionService = require("../services/transcriptionService");
 const {
   emotionToEmoji,
   sentimentToScore,
@@ -126,46 +125,6 @@ const createJournal = asyncHandler(async (req, res) => {
 });
 
 /**
- * Transcribe a temporary voice journal recording.
- *
- * Audio is never persisted by Node. Multer keeps it in memory long
- * enough to forward it to the Python AI service, which writes only a
- * temporary file for Whisper and deletes it after processing.
- */
-const transcribeJournalAudio = asyncHandler(async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json(response.error("Audio file is required."));
-  }
-
-  let transcript;
-
-  try {
-    transcript = await transcriptionService.transcribeAudio(req.file);
-  } catch (err) {
-    const status = err.statusCode || 503;
-    return res.status(status).json(
-      response.error(
-        status === 413
-          ? "Audio recording is too large."
-          : err.message || "Unable to transcribe audio. Please try again."
-      )
-    );
-  }
-
-  if (!transcript?.text || !transcript.text.trim()) {
-    return res.status(422).json(response.error("No speech was detected in the recording."));
-  }
-
-  res.status(200).json(
-    response.success("Audio transcribed successfully", {
-      text: transcript.text.trim(),
-      language: transcript.language || "en",
-      duration: transcript.duration ?? null,
-    })
-  );
-});
-
-/**
  * Delete a journal entry by ID
  */
 const deleteJournal = asyncHandler(async (req, res) => {
@@ -219,7 +178,6 @@ module.exports = {
   getJournals,
   getJournalById,
   createJournal,
-  transcribeJournalAudio,
   deleteJournal,
   getRecentJournals,
 };
