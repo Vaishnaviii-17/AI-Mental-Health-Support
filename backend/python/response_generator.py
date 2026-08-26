@@ -46,6 +46,8 @@ Example:
 
 from typing import Dict, Any, Optional, List
 import os
+import re
+import difflib
 
 
 class ResponseGenerator:
@@ -115,6 +117,24 @@ class ResponseGenerator:
         # conversational "mode", so the conversation does not read
         # like a questionnaire.
         #
+
+        # Canned openers that made the LLM's responses feel templated
+        # ("It sounds like...", "I understand...", etc.). Used only
+        # as a lightweight guard against the LLM reusing these — not
+        # a replacement list to draw from.
+        self.overused_openers = (
+            "it sounds like",
+            "i understand",
+            "i can understand",
+            "i can hear",
+            "i hear you",
+            "that sounds",
+            "that must be",
+            "it seems like",
+            "it can be",
+            "how have you been",
+            "is there anything",
+        )
 
         self.topic_labels = {
             "academics": "your studies",
@@ -652,6 +672,108 @@ class ResponseGenerator:
             "Fair enough — some days just feel like that.",
         ]
 
+        # Dedicated pools for conversational intents that shouldn't be
+        # routed through the topic/emotion reflection banks at all —
+        # greetings, short replies, and direct requests read oddly if
+        # forced into an emotional reflection.
+        self.greeting_responses = [
+            "Hey! Good to see you. How's your day going?",
+            "Hi there — what's on your mind today?",
+            "Hello! What's going on with you today?",
+        ]
+
+        # Generic short acknowledgments ("hmm", "okay", "fine") where
+        # there's no clear yes/no/uncertain signal.
+        self.acknowledgment_responses = [
+            "Fair enough.",
+            "Sometimes that's honestly all there is to say.",
+            "Noted — no pressure to add more than that.",
+            "That's alright.",
+        ]
+
+        # "yes" / "yeah" / "sure" — usually confirming or answering
+        # something the assistant just said or asked.
+        self.affirmative_responses = [
+            "Okay, that helps make sense of it.",
+            "Got it — that clears things up a bit.",
+            "Good to know, thanks for confirming.",
+        ]
+
+        # "no" / "nope" / "not really"
+        self.negative_responses = [
+            "That's fine — no need to force it.",
+            "Fair enough, that's useful to know too.",
+            "Okay, that's good to know either way.",
+        ]
+
+        # "maybe" / "not sure" / "dunno"
+        self.uncertain_responses = [
+            "That's okay — it doesn't have to be a clear answer right now.",
+            "No need to have it fully figured out yet.",
+            "That's a fair place to sit with it for now.",
+        ]
+
+        self.direct_request_fallback = [
+            "I don't have a specific answer ready for that right now, but I'm happy to think it through with you.",
+            "I'm not able to pull up something specific for that at the moment — want to figure it out together instead?",
+        ]
+
+        # Lightweight, keyword-based intent detection. This is
+        # deliberately simple: it only needs to catch clear cases so
+        # the response generator doesn't force a greeting or a short
+        # "hmm" into a topic/emotion reflection, doesn't misread a
+        # plain "yes"/"no" as generic filler, and doesn't turn a
+        # direct request or an explicit ask for help into another
+        # clarifying question.
+        self._greeting_words = {
+            "hi", "hii", "hiii", "hello", "hey", "heya", "yo", "sup",
+            "good morning", "good afternoon", "good evening",
+        }
+
+        self._affirmative_words = {
+            "yes", "yeah", "yea", "yep", "yup", "sure", "of course",
+            "definitely", "absolutely",
+        }
+
+        self._negative_words = {
+            "no", "nope", "nah", "not really", "not really no",
+        }
+
+        self._uncertain_words = {
+            "maybe", "not sure", "dunno", "i don't know", "idk",
+            "perhaps", "possibly", "kind of", "sort of",
+        }
+
+        self._acknowledgment_words = {
+            "hmm", "hm", "okay", "ok", "k", "fine", "alright",
+            "nothing much", "meh", "hmm okay",
+        }
+
+        self._direct_request_markers = (
+            "do you have any suggestion",
+            "any suggestions",
+            "can you suggest",
+            "can you recommend",
+            "do you have a recommendation",
+            "recommend some",
+            "recommend a",
+            "what should i",
+            "what do you suggest",
+            "how do i",
+            "how can i",
+            "can you help me with",
+            "give me some ideas",
+            "any ideas",
+            "help me",
+            "i need help",
+            "need some help",
+            "need advice",
+            "please help",
+            "can you help",
+            "what can i do",
+            "what would help",
+        )
+
         # Kept for backward compatibility in case any other module
         # inspects this attribute directly.
         self.fallback_responses = self.reflections
@@ -736,6 +858,12 @@ class ResponseGenerator:
             previous_emotion = self._normalize_emotion(previous_emotion)
 
         # =====================================================
+        # LIGHTWEIGHT INTENT FLAGS
+        # =====================================================
+
+        intent_flags = self._detect_intent_flags(user_text)
+
+        # =====================================================
         # CONVERSATION HISTORY
         # =====================================================
 
@@ -762,6 +890,7 @@ class ResponseGenerator:
                 analysis=analysis,
                 previous_topic=previous_topic,
                 previous_emotion=previous_emotion,
+                intent_flags=intent_flags,
             )
 
             if response:
@@ -788,11 +917,63 @@ class ResponseGenerator:
             user_text=user_text,
             previous_topic=previous_topic,
             previous_emotion=previous_emotion,
+            intent_flags=intent_flags,
         )
 
     # =========================================================
     # NORMALIZATION
     # =========================================================
+
+    def _detect_intent_flags(self, user_text: str) -> Dict[str, bool]:
+
+        """
+        Cheap, keyword-based detection of a few conversational
+        intents that should bypass the normal topic/emotion
+        reflection pipeline: greetings, short acknowledgments, and
+        direct requests for information/advice/suggestions.
+
+        This intentionally does NOT attempt full intent
+        classification — that remains the responsibility of the
+        conversation analyzer. It only catches clear, low-risk
+        cases so the response generator doesn't force a "hii" or a
+        "hmm" into an emotional reflection, and doesn't turn a
+        direct request into another clarifying question.
+        """
+
+        text = (user_text or "").strip().lower()
+        text = text.strip("!.,? ")
+
+        is_greeting = text in self._greeting_words
+
+        is_affirmative = text in self._affirmative_words
+        is_negative = text in self._negative_words
+        is_uncertain = text in self._uncertain_words
+
+        is_short_ack = (
+            not is_affirmative
+            and not is_negative
+            and not is_uncertain
+            and text in self._acknowledgment_words
+        )
+
+        is_direct_request = any(
+            marker in text for marker in self._direct_request_markers
+        ) or (
+            text.endswith("?")
+            and any(
+                text.startswith(prefix)
+                for prefix in ("do you have", "can you", "could you", "what should", "any ")
+            )
+        )
+
+        return {
+            "is_greeting": is_greeting,
+            "is_short_ack": is_short_ack,
+            "is_affirmative": is_affirmative,
+            "is_negative": is_negative,
+            "is_uncertain": is_uncertain,
+            "is_direct_request": is_direct_request,
+        }
 
     def _normalize_topic(self, topic: Optional[str]) -> str:
 
@@ -903,6 +1084,7 @@ class ResponseGenerator:
         analysis: Dict[str, Any],
         previous_topic: Optional[str] = None,
         previous_emotion: Optional[str] = None,
+        intent_flags: Optional[Dict[str, bool]] = None,
     ) -> Optional[str]:
 
         """
@@ -1064,9 +1246,96 @@ guide, not a script:
   existing thread — show that you remember, and build on it rather
   than starting over.
 
+AVOID SOUNDING TEMPLATED:
+
+Do not repeatedly open responses with phrases like "It sounds
+like...", "I understand...", "I can understand...", "I can
+hear...", "That sounds...", "That must be...", "It seems like...",
+"It can be...", "How have you been...", or "Is there anything...".
+If your own recent responses in this conversation already used one
+of these (see below), pick a different construction this time —
+for example a direct reflection, a short warm acknowledgment, an
+emotion-focused observation, a continuation of the previous point,
+a gentle validation stated in a fresh way, a plain conversational
+reply, or a supportive observation about a pattern you notice. Vary
+which of these you reach for from one turn to the next.
+
+Do not simply restate the user's sentence in slightly different
+words — add something conversationally useful: a connection to
+something they said earlier, a bit of perspective, a small
+practical idea, or genuine acknowledgment that goes beyond
+paraphrase.
+
+Do not over-use validating phrases like "that must be really
+hard," "your feelings are valid," or "it's okay to feel this way."
+They're fine occasionally, but repeating them turns the
+conversation into a script — usually it's better to just show
+understanding through the substance of the response.
+
+MATCH THE USER'S ENERGY:
+
+- Casual message ("hii", "nothing much", "just bored") → respond
+  casually and briefly. Don't analyze emotion or bring up topics
+  the user hasn't raised.
+- Distressed message → slow down, and give more emotional weight
+  and space in your response.
+- Positive/happy message → respond warmly and naturally, the way a
+  friend would react to good news, without turning it into a
+  mental-health exploration.
+- Short answer (e.g. a single word or phrase) → build on it
+  naturally with a proportionately short response. Don't force a
+  long, elaborate reply out of a short message.
+
+Vary your response length to match the moment: short for casual
+exchanges, a bit longer when the user needs real support or
+perspective, and never padded just to sound thorough.
+
+MATCH THE USER'S INTENT:
+
+Before responding, consider what the user is actually doing:
+greeting you, making casual conversation, venting, sharing an
+emotion, asking for advice, asking for information or
+recommendations, giving a short acknowledgment ("hmm", "yeah",
+"okay", "fine"), changing the subject, or sharing something
+positive. Respond in the way that intent calls for rather than
+defaulting to reflection-plus-question for all of them.
+
+ANSWER DIRECT REQUESTS DIRECTLY:
+
+If the user is asking for something concrete — a suggestion,
+recommendation, piece of information, or advice — or explicitly
+asks for help ("can you help me", "I need help with this"), answer
+it with useful, substantive support using whatever relevant context
+is available in the conversation history (e.g. a genre, preference,
+or constraint they already mentioned). Do not respond to a direct
+request or an explicit ask for help with another clarifying
+question unless the request is genuinely too ambiguous to act on.
+"Do you have any suggestions?" after the user already told you what
+they
+like is a request to be answered, not a cue to ask what they like.
+
+FOLLOW TOPIC CHANGES:
+
+If the user shifts from an emotional topic to something casual (or
+vice versa), follow them there. Do not pull the conversation back
+to the earlier topic unless there's a safety reason to.
+
+The conversation should feel reciprocal — you respond meaningfully,
+sometimes add a thought or suggestion, and only sometimes ask
+something — never a fixed reflect-then-ask loop repeated every
+turn. Do not ask a question in back-to-back responses.
+
 Your response must be directly relevant to the user's latest
 message.
 """
+
+        # =====================================================
+        # RECENT-RESPONSE CONTEXT (anti-repetition)
+        # =====================================================
+
+        recent_assistant_texts = self._get_recent_assistant_responses(
+            conversation_history, limit=4
+        )
 
         # =====================================================
         # ANALYSIS CONTEXT
@@ -1079,6 +1348,61 @@ message.
 
         if previous_emotion and previous_emotion != emotion:
             continuity_lines += f"\nPrevious emotion: {previous_emotion}"
+
+        if recent_assistant_texts:
+            recent_openings = [
+                self._normalize_opening(t, word_count=6)
+                for t in recent_assistant_texts[:3]
+            ]
+            recent_openings = [o for o in recent_openings if o]
+
+            if recent_openings:
+                quoted = "; ".join(f'"{o}..."' for o in recent_openings)
+                continuity_lines += (
+                    "\nYour most recent responses in this conversation began "
+                    f"with: {quoted}. Do not start this response the same way "
+                    "— use a different construction."
+                )
+
+            recent_question_count = sum(
+                1 for t in recent_assistant_texts[:3] if t.strip().endswith("?")
+            )
+
+            if recent_assistant_texts[0].strip().endswith("?"):
+                continuity_lines += (
+                    "\nNote: your immediately preceding response ended with "
+                    "a question. Do not end this response with a question "
+                    "as well — respond, add a thought, or offer something "
+                    "instead."
+                )
+            elif recent_question_count >= 2:
+                continuity_lines += (
+                    "\nNote: your last few responses ended with a question. "
+                    "This turn, prefer not ending with a question unless it "
+                    "is genuinely necessary."
+                )
+
+        if intent_flags:
+            if intent_flags.get("is_greeting"):
+                continuity_lines += (
+                    "\nThe user's message is a greeting. Respond with a "
+                    "brief, friendly greeting — do not launch into an "
+                    "emotional question."
+                )
+            if intent_flags.get("is_short_ack"):
+                continuity_lines += (
+                    "\nThe user's message is a short acknowledgment (e.g. "
+                    "'hmm', 'yeah', 'okay'). Respond briefly and naturally "
+                    "— do not automatically ask another question."
+                )
+            if intent_flags.get("is_direct_request"):
+                continuity_lines += (
+                    "\nThe user is making a direct request for information, "
+                    "advice, or a suggestion. Answer it directly using "
+                    "conversation context already available, rather than "
+                    "asking a clarifying question, unless the request is "
+                    "genuinely too vague to act on."
+                )
 
         analysis_context = f"""
 Application analysis (for your understanding only — never mention
@@ -1158,7 +1482,11 @@ The latest user message is:
         # SAFETY / QUALITY GUARDS
         # =====================================================
 
-        if not self._is_valid_llm_response(response=response, user_text=user_text):
+        if not self._is_valid_llm_response(
+            response=response,
+            user_text=user_text,
+            recent_assistant_texts=recent_assistant_texts,
+        ):
             print(
                 "Hugging Face returned a response that failed "
                 "validation. Using fallback."
@@ -1171,24 +1499,114 @@ The latest user message is:
     # LLM RESPONSE VALIDATION
     # =========================================================
 
-    def _is_valid_llm_response(self, response: str, user_text: str) -> bool:
+    def _normalize_opening(self, text: str, word_count: int = 5) -> str:
+
+        """
+        Lowercase, punctuation-free version of the first few words of
+        a response, used only to compare openings across turns.
+        """
+
+        if not text:
+            return ""
+
+        words = re.findall(r"[a-z']+", text.lower())[:word_count]
+
+        return " ".join(words)
+
+    def _is_near_duplicate(self, a: str, b: str, threshold: float = 0.82) -> bool:
+
+        """
+        True if two responses are the same or close enough in wording
+        that returning both in a row would feel like a repeat, even
+        if they aren't character-for-character identical.
+        """
+
+        if not a or not b:
+            return False
+
+        a_clean = a.strip().lower()
+        b_clean = b.strip().lower()
+
+        if a_clean == b_clean:
+            return True
+
+        ratio = difflib.SequenceMatcher(None, a_clean, b_clean).ratio()
+
+        return ratio >= threshold
+
+    def _is_valid_llm_response(
+        self,
+        response: str,
+        user_text: str,
+        recent_assistant_texts: Optional[List[str]] = None,
+    ) -> bool:
 
         """
         Lightweight output validation.
 
         This is NOT a replacement for a dedicated safety layer. It
-        simply prevents obviously malformed or meta-leaking
-        responses from being returned to the user.
+        prevents obviously malformed or meta-leaking responses, and
+        also guards against the specific repetitive patterns
+        (canned openers, repeated openings, back-to-back questions)
+        that made the LLM's responses feel templated. When a
+        response fails this check, the caller falls back to the
+        existing, already-varied fallback response system.
         """
 
         if not response:
             return False
 
-        if len(response) < 5:
+        if len(response) < 2:
             return False
 
         if len(response) > 1200:
             return False
+
+        cleaned = response.strip().strip('"').lower()
+
+        # Overused, templated openers ("It sounds like...", "I
+        # understand...") are only rejected if they've actually been
+        # used recently in this conversation. An occasional, natural
+        # use of one of these phrases is fine — the problem is only
+        # when it becomes a repeated template, so this check should
+        # not reject a perfectly good response just because it shares
+        # an opener with a first-turn default.
+        if cleaned.startswith(self.overused_openers) and recent_assistant_texts:
+            opener_recently_used = any(
+                prior.strip().strip('"').lower().startswith(self.overused_openers)
+                for prior in recent_assistant_texts[:3]
+            )
+            if opener_recently_used:
+                return False
+
+        if recent_assistant_texts:
+
+            # Reject exact or near-identical repeats of a recent
+            # response — this is the main duplicate-prevention guard
+            # for the LLM path (the fallback path has its own,
+            # separate guard in `_pick`).
+            for prior in recent_assistant_texts[:3]:
+                if self._is_near_duplicate(response, prior):
+                    return False
+
+            new_opening = self._normalize_opening(response)
+
+            for prior in recent_assistant_texts[:2]:
+                if new_opening and new_opening == self._normalize_opening(prior):
+                    return False
+
+            if response.strip().endswith("?"):
+
+                if recent_assistant_texts[0].strip().endswith("?"):
+                    return False
+
+                recent_question_count = sum(
+                    1
+                    for prior in recent_assistant_texts[:3]
+                    if prior.strip().endswith("?")
+                )
+                if recent_question_count >= 2:
+                    return False
 
         forbidden_phrases = [
             "as an ai language model",
@@ -1214,9 +1632,6 @@ The latest user message is:
                 return False
 
         invalid_exact = {
-            "okay",
-            "ok",
-            "sure",
             "i understand",
             "understood",
             "noted",
@@ -1241,6 +1656,7 @@ The latest user message is:
         user_text: str,
         previous_topic: Optional[str] = None,
         previous_emotion: Optional[str] = None,
+        intent_flags: Optional[Dict[str, bool]] = None,
     ) -> str:
 
         # =====================================================
@@ -1249,6 +1665,44 @@ The latest user message is:
 
         if risk_level == "high":
             return self._high_risk_response(topic=topic)
+
+        # =====================================================
+        # INTENT SHORTCUTS
+        # =====================================================
+        #
+        # Greetings, short acknowledgments, and direct requests read
+        # oddly if forced through the topic/emotion reflection bank
+        # below, so they're handled directly.
+        #
+
+        intent_flags = intent_flags or {}
+
+        if intent_flags.get("is_greeting"):
+            return self._pick(self.greeting_responses, conversation_history)
+
+        # "yes"/"no"/"maybe" carry meaning relative to whatever the
+        # assistant just said (usually a question) — treat them
+        # distinctly from generic filler like "hmm" or "okay" rather
+        # than collapsing everything into the same canned reply.
+        if intent_flags.get("is_affirmative"):
+            return self._pick(self.affirmative_responses, conversation_history)
+
+        if intent_flags.get("is_negative"):
+            return self._pick(self.negative_responses, conversation_history)
+
+        if intent_flags.get("is_uncertain"):
+            return self._pick(self.uncertain_responses, conversation_history)
+
+        if intent_flags.get("is_short_ack"):
+            return self._pick(self.acknowledgment_responses, conversation_history)
+
+        if intent_flags.get("is_direct_request"):
+            # Context-aware: if the conversation already has an
+            # identified topic, offer the practical suggestion tied
+            # to that topic instead of a vague, content-free line.
+            if topic in self.suggestions and topic != "unknown":
+                return self._pick(self.suggestions[topic], conversation_history)
+            return self._pick(self.direct_request_fallback, conversation_history)
 
         # =====================================================
         # BASE REFLECTION
@@ -1432,11 +1886,30 @@ The latest user message is:
             return ""
 
         recent_responses = self._get_recent_assistant_responses(conversation_history)
+        last_response = recent_responses[0] if recent_responses else None
 
-        available = [r for r in responses if r not in recent_responses]
+        # Filter out exact or near-identical repeats of recent
+        # responses, with particular emphasis on never repeating the
+        # immediately preceding assistant message.
+        available = [
+            r
+            for r in responses
+            if r not in recent_responses
+            and not (last_response and self._is_near_duplicate(r, last_response))
+        ]
 
         if not available:
-            available = responses
+            # Every option looks like something said recently —
+            # relax the broader history filter but still avoid
+            # repeating the very last thing that was said, if there's
+            # any alternative at all.
+            if last_response:
+                available = [
+                    r for r in responses
+                    if not self._is_near_duplicate(r, last_response)
+                ]
+            if not available:
+                available = responses
 
         return self._select_response(available, conversation_history)
 
@@ -1453,10 +1926,7 @@ The latest user message is:
         """
 
         if not responses:
-            return (
-                "It sounds like this has been difficult for you. "
-                "What feels most important to talk about right now?"
-            )
+            return "Let's take this one step at a time."
 
         assistant_count = sum(
             1
