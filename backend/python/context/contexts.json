@@ -1,0 +1,105 @@
+{
+  "academics": {
+    "examples": [
+      "I am stressed about my exams.",
+      "I have too many assignments.",
+      "I am worried about my grades.",
+      "I am scared that I will fail my exams.",
+      "College work is overwhelming me.",
+      "I cannot handle my academic workload.",
+      "I am under pressure to perform well in college.",
+      "I have been staying up late because of my college workload.",
+      "My university studies are becoming overwhelming.",
+      "I have too much coursework to finish.",
+      "I am struggling to keep up with my classes.",
+      "My exams and assignments are stressing me out.",
+      "I am under a lot of pressure because of my studies.",
+      "I cannot manage my college deadlines.",
+      "My studies are affecting my sleep."
+    ]
+  },
+
+  "relationships": {
+    "examples": [
+      "My best friend stopped talking to me.",
+      "I am having problems with my friends.",
+      "My partner and I keep arguing.",
+      "I am going through a breakup.",
+      "Someone I care about rejected me.",
+      "I feel lonely because I have nobody to talk to.",
+      "My relationship is causing me a lot of stress.",
+      "I feel hurt because someone I was close to has been avoiding me.",
+      "I am having problems with someone I love.",
+      "My friendship is becoming difficult.",
+      "I feel rejected by someone close to me."
+    ]
+  },
+
+  "family": {
+    "examples": [
+      "My parents keep comparing me with my cousin.",
+      "My family puts a lot of pressure on me.",
+      "My parents don't understand me.",
+      "I keep arguing with my parents.",
+      "There are problems at home.",
+      "My mother and father have very high expectations from me.",
+      "I feel stressed because of my family.",
+      "My parents expect too much from me.",
+      "My family keeps comparing me with other people.",
+      "There is a lot of conflict in my family."
+    ]
+  },
+
+  "work": {
+    "examples": [
+      "I have too much work at my office.",
+      "My job is stressing me out.",
+      "My manager is putting too much pressure on me.",
+      "I have too many deadlines at work.",
+      "I am having problems with my colleagues.",
+      "My workplace is making me anxious.",
+      "I am overwhelmed by my workload.",
+      "My office responsibilities have become too difficult to manage.",
+      "My job responsibilities are overwhelming me.",
+      "I am stressed because of my manager.",
+      "My boss keeps giving me more work.",
+      "I cannot handle the pressure at my workplace.",
+      "My professional responsibilities are becoming difficult.",
+      "I am struggling with my job.",
+      "The workload at my office is affecting me."
+    ]
+  },
+
+  "self": {
+    "examples": [
+      "I don't feel confident about myself.",
+      "I don't think I am good enough.",
+      "I have very low self-esteem.",
+      "I constantly doubt myself.",
+      "I don't like the way I see myself.",
+      "I feel insecure about myself.",
+      "I feel like I am not good enough.",
+      "Lately I keep doubting whether I am capable enough.",
+      "I don't believe in myself anymore.",
+      "I feel like I am not capable.",
+      "I keep comparing myself to other people.",
+      "I feel bad about myself."
+    ]
+  },
+
+  "future": {
+    "examples": [
+      "I am worried about getting a job after graduation.",
+      "I don't know what I want to do with my future.",
+      "I am scared about my career.",
+      "I am worried about what will happen after college.",
+      "I don't know what career to choose.",
+      "I am uncertain about my future.",
+      "I am scared that I won't be successful.",
+      "I have no idea what I am going to do once I finish my degree.",
+      "I am worried about my career after graduation.",
+      "I don't know what I should do with my life.",
+      "I am anxious about my future plans."
+    ]
+  }
+}
