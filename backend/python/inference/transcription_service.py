@@ -14,13 +14,16 @@ except ImportError:  # pragma: no cover - exercised when deps are missing locall
 
 
 SUPPORTED_LANGUAGES = {
+    "en": "en",
+    "hi": "hi",
+    "mr": "mr",
     "english": "en",
     "hindi": "hi",
     "marathi": "mr",
 }
 
-DEFAULT_LANGUAGE = os.getenv("WHISPER_LANGUAGE", "en")
-DEFAULT_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "tiny.en")
+DEFAULT_LANGUAGE = os.getenv("WHISPER_LANGUAGE", "auto")
+DEFAULT_MODEL_SIZE = os.getenv("WHISPER_MODEL_SIZE", "base")
 DEFAULT_DEVICE = os.getenv("WHISPER_DEVICE", "auto")
 DEFAULT_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
 
@@ -62,7 +65,26 @@ class TranscriptionService:
 
         return self._model
 
-    def transcribe(self, audio_path):
+    def _normalize_language(self, language=None):
+        value = (language or self.language or "en").strip().lower()
+        normalized = SUPPORTED_LANGUAGES.get(value)
+
+        if normalized is None:
+            supported = ", ".join(sorted({"en", "hi", "mr"}))
+            raise ValueError(
+                f"unsupported transcription language. Supported languages: {supported}"
+            )
+
+        if normalized != "en" and self.model_size.endswith(".en"):
+            raise ValueError(
+                "Hindi and Marathi transcription require a multilingual Whisper "
+                "model. Set WHISPER_MODEL_SIZE to tiny, base, small, medium, "
+                "or large instead of an .en model."
+            )
+
+        return normalized
+
+    def transcribe(self, audio_path, language=None):
         path = Path(audio_path)
 
         if not path.exists() or not path.is_file():
@@ -72,10 +94,11 @@ class TranscriptionService:
             raise ValueError("audio file is empty")
 
         model = self._load_model()
+        transcription_language = self._normalize_language(language)
 
         segments, info = model.transcribe(
             str(path),
-            language=self.language,
+            language=transcription_language,
             beam_size=5,
             vad_filter=True,
         )
@@ -84,6 +107,6 @@ class TranscriptionService:
 
         return {
             "text": text,
-            "language": getattr(info, "language", self.language) or self.language,
+            "language": getattr(info, "language", transcription_language) or transcription_language,
             "duration": getattr(info, "duration", None),
         }

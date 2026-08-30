@@ -21,9 +21,10 @@ export const createJournal = async (journalData) => {
   return response.data?.data ?? response.data;
 };
 
-export const transcribeJournalAudio = async (audioBlob) => {
+export const transcribeJournalAudio = async (audioBlob, language = "en") => {
   const formData = new FormData();
   formData.append("audio", audioBlob, "journal-audio.webm");
+  formData.append("language", language);
 
   const response = await api.post("/journal/transcribe", formData, {
     headers: {

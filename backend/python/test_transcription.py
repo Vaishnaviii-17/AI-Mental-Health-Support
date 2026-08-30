@@ -2,7 +2,7 @@
 Manual transcription smoke test.
 
 Usage:
-    python test_transcription.py path/to/sample-english-audio.webm
+    python test_transcription.py path/to/sample-audio.webm --language hi
 
 The repository intentionally does not include voice recordings. Use a short
 local English sample recorded from the browser or another trusted source.
@@ -15,11 +15,17 @@ from inference.transcription_service import TranscriptionService
 
 def main():
     parser = argparse.ArgumentParser(description="Test Whisper transcription.")
-    parser.add_argument("audio_path", help="Path to a local English audio file")
+    parser.add_argument("audio_path", help="Path to a local audio file")
+    parser.add_argument(
+        "--language",
+        choices=["en", "hi", "mr"],
+        default="en",
+        help="Spoken language in the sample audio",
+    )
     args = parser.parse_args()
 
     service = TranscriptionService()
-    result = service.transcribe(args.audio_path)
+    result = service.transcribe(args.audio_path, language=args.language)
     print(json.dumps(result, indent=2))
 
 

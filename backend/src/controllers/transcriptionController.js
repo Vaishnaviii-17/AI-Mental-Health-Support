@@ -16,7 +16,10 @@ const transcribeAudio = asyncHandler(async (req, res) => {
   let transcript;
 
   try {
-    transcript = await transcriptionService.transcribeAudio(req.file);
+    transcript = await transcriptionService.transcribeAudio(
+      req.file,
+      req.body?.language
+    );
   } catch (err) {
     const status = err.statusCode || 503;
     return res.status(status).json(

@@ -41,14 +41,17 @@ async function createJournal(
     sentimentScore,
     riskAnalysis,
     insight,
+    originalLanguage,
+    translatedContent,
   }
 ) {
   const query = `
     INSERT INTO journals (
       user_id, title, content, mood, emotion,
-      secondary_emotions, sentiment_score, risk_analysis, insight
+      secondary_emotions, sentiment_score, risk_analysis, insight,
+      original_language, translated_content
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING *;
   `;
 
@@ -62,6 +65,8 @@ async function createJournal(
     sentimentScore,
     JSON.stringify(riskAnalysis || {}),
     insight,
+    originalLanguage || "en",
+    translatedContent || null,
   ];
   const { rows } = await pool.query(query, values);
   return rows[0];

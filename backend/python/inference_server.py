@@ -33,6 +33,15 @@ Node.js communicates with this server over HTTP.
 import os
 import tempfile
 
+from pathlib import Path
+from dotenv import load_dotenv
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / ".env")
+
+print("WHISPER_MODEL_SIZE =", os.getenv("WHISPER_MODEL_SIZE"))
+print("WHISPER_LANGUAGE =", os.getenv("WHISPER_LANGUAGE"))
+
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
@@ -110,6 +119,8 @@ AUDIO_MAX_BYTES = int(
     )
 )
 
+SUPPORTED_TRANSCRIPTION_LANGUAGES = {"en", "hi", "mr"}
+
 
 # ============================================================
 # HELPERS
@@ -147,6 +158,17 @@ def _validate_audio_upload(file_storage):
         return "unsupported audio content type"
 
     return None
+
+
+def _validate_language(language):
+    normalized = (language or "en").strip().lower()
+
+    if normalized not in SUPPORTED_TRANSCRIPTION_LANGUAGES:
+        return None, (
+            "unsupported language. Supported languages are: en, hi, mr"
+        )
+
+    return normalized, None
 
 
 def _normalize_history(history):
@@ -527,8 +549,19 @@ def transcribe():
                 "error": "audio file is too large"
             }), 413
 
+        language, language_error = _validate_language(
+            request.form.get("language")
+        )
+
+        if language_error:
+
+            return jsonify({
+                "error": language_error
+            }), 400
+
         result = transcription_service.transcribe(
-            temp_path
+            temp_path,
+            language=language,
         )
 
         if not result.get("text"):
