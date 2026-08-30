@@ -1,5 +1,10 @@
 const journalModel = require("../models/journalModel");
 const inferenceService = require("../services/inferenceService");
+const translationService = require("../services/translationService");
+const {
+  assertSupportedLanguage,
+  detectLanguageFromText,
+} = require("../utils/language");
 const {
   emotionToEmoji,
   sentimentToScore,
@@ -53,6 +58,45 @@ const createJournal = asyncHandler(async (req, res) => {
   }
 
   const trimmedContent = content.trim();
+  let originalLanguage;
+
+  try {
+    const requestedLanguage =
+      req.body?.originalLanguage || req.body?.original_language;
+    const detectedLanguage = detectLanguageFromText(trimmedContent);
+
+    originalLanguage = assertSupportedLanguage(
+      requestedLanguage && requestedLanguage !== "en"
+        ? requestedLanguage
+        : detectedLanguage
+    );
+  } catch (err) {
+    return res
+      .status(err.statusCode || 400)
+      .json(response.error(err.message));
+  }
+
+  let translationResult;
+
+  try {
+    translationResult = await translationService.translateToEnglish(
+      trimmedContent,
+      originalLanguage
+    );
+  } catch (err) {
+    console.error("Journal translation failed:", err.message);
+
+    return res
+      .status(err.statusCode || 503)
+      .json(
+        response.error(
+          err.message ||
+            "Unable to translate this journal entry for AI analysis."
+        )
+      );
+  }
+
+  const analysisText = translationResult.text;
 
   // 1. Run the trained GoEmotions model (emotion + sentiment + risk)
   //    via the Python inference server. A single call -- Python
@@ -60,7 +104,7 @@ const createJournal = asyncHandler(async (req, res) => {
   let analysis;
 
   try {
-    analysis = await inferenceService.analyzeText(trimmedContent);
+    analysis = await inferenceService.analyzeText(analysisText);
   } catch (err) {
     console.error("Journal ML analysis failed:", err.message);
 
@@ -113,6 +157,8 @@ const createJournal = asyncHandler(async (req, res) => {
     sentimentScore: sentimentToScore(analysis.sentiment?.scores),
     riskAnalysis,
     insight: buildJournalSummary(analysis),
+    originalLanguage,
+    translatedContent: translationResult.translatedText,
   });
 
   // NOTE: We intentionally do NOT auto-create a mood check-in record
@@ -138,7 +184,8 @@ const deleteJournal = asyncHandler(async (req, res) => {
 const getRecentJournals = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const query = `
-    SELECT id, title, content, mood, emotion, insight, created_at AS "date"
+    SELECT id, title, content, mood, emotion, insight,
+           original_language, translated_content, created_at AS "date"
     FROM journals
     WHERE user_id = $1
     ORDER BY created_at DESC

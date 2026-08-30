@@ -31,7 +31,7 @@ This project is being developed as a **Final Year B.Tech Computer Engineering Pr
 - Daily Mood Tracking
 - Mood History
 - Personal Journal
-- English Voice Journaling with Whisper Speech-to-Text
+- English, Hindi, and Marathi Voice Journaling with Whisper Speech-to-Text
 - AI Mental Health Chatbot
 - Personalized Recommendations
 - Mental Health Resources
@@ -231,28 +231,42 @@ http://localhost:5173
 
 Voice journaling is an additional input method for the existing journal form.
 It does not replace typed journals or the GoEmotions analysis pipeline.
+Supported journal languages are English (`en`), Hindi (`hi`), and Marathi
+(`mr`). The original journal text is always preserved in the language the user
+spoke or typed.
 
 ```text
-Microphone
-  ↓
-Browser MediaRecorder audio
-  ↓
-Node/Express POST /api/journal/transcribe
-  ↓
-Python AI service POST /transcribe
-  ↓
-faster-whisper speech-to-text
-  ↓
-Editable transcript in the journal textarea
-  ↓
-Existing Save Entry flow
-  ↓
-Existing GoEmotions emotion, wellness, and risk analysis
+Voice
+  |
+  v
+Whisper
+  |
+  v
+Original Language Text
+  |
+  v
+Translation (hi/mr only)
+  |
+  v
+English Analysis Text
+  |
+  v
+GoEmotions
+  |
+  v
+Database
 ```
 
-Current support is English only. Hindi and Marathi are planned for later, but
-no language selector, translation, or multilingual emotion model is included
-yet.
+For English journals, the original text is analyzed directly. For Hindi and
+Marathi journals, the backend translates the text to English first, sends only
+that English analysis text to GoEmotions/risk analysis, and stores the original
+language text in `journals.content`.
+
+The journal table stores:
+
+- `content`: original user text
+- `original_language`: `en`, `hi`, or `mr`
+- `translated_content`: English translation for Hindi/Marathi entries
 
 Whisper settings are centralized in environment variables:
 
@@ -266,8 +280,25 @@ TRANSCRIPTION_TIMEOUT_MS=60000
 ```
 
 The default model is `tiny.en`, chosen for local development speed and lower
-resource use. Larger models can be configured later through `WHISPER_MODEL_SIZE`
-without changing the journal UI.
+resource use. Hindi and Marathi require a multilingual Whisper model, so set
+`WHISPER_MODEL_SIZE` to `tiny`, `base`, `small`, `medium`, or `large` when
+testing those languages.
+
+Translation is server-side only and is configured through environment variables:
+
+```env
+TRANSLATION_PROVIDER=auto
+TRANSLATION_TIMEOUT_MS=20000
+TRANSLATION_API_KEY=
+LIBRETRANSLATE_URL=
+GEMINI_TRANSLATION_MODEL=gemini-1.5-flash
+```
+
+`TRANSLATION_PROVIDER=auto` uses LibreTranslate when `LIBRETRANSLATE_URL` is
+set, otherwise Gemini when `GEMINI_API_KEY` is configured. You can also set
+`TRANSLATION_PROVIDER=libretranslate`, `gemini`, or `disabled` explicitly. If a
+Hindi or Marathi entry cannot be translated, the journal is not saved and the
+English-only analysis model is not run on untranslated text.
 
 Audio privacy handling:
 
@@ -281,12 +312,12 @@ Manual transcription smoke test:
 
 ```bash
 cd backend/python
-python test_transcription.py path\to\sample-english-audio.webm
+python test_transcription.py path\to\sample-audio.webm --language hi
 ```
 
-Suggested samples: a short English sentence, multiple sentences, normal
-speaking speed, pauses, and Indian English pronunciation. The repository does
-not include voice recordings because journal audio is sensitive.
+Suggested samples: short English, Hindi, and Marathi sentences, multiple
+sentences, normal speaking speed, pauses, and Indian English pronunciation. The
+repository does not include voice recordings because journal audio is sensitive.
 
 ---
 

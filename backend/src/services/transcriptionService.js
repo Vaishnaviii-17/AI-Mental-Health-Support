@@ -6,6 +6,7 @@
  */
 const axios = require("axios");
 const FormData = require("form-data");
+const { assertSupportedLanguage } = require("../utils/language");
 
 const ML_INFERENCE_URL =
   process.env.ML_INFERENCE_URL ||
@@ -15,10 +16,12 @@ const ML_INFERENCE_URL =
 const TRANSCRIPTION_TIMEOUT_MS =
   Number(process.env.TRANSCRIPTION_TIMEOUT_MS) || 60000;
 
-async function transcribeAudio(file) {
+async function transcribeAudio(file, language) {
   if (!file || !file.buffer || file.size <= 0) {
     throw new Error("audio file is required");
   }
+
+  const transcriptionLanguage = assertSupportedLanguage(language);
 
   const form = new FormData();
   form.append("audio", file.buffer, {
@@ -26,6 +29,7 @@ async function transcribeAudio(file) {
     contentType: file.mimetype || "audio/webm",
     knownLength: file.size,
   });
+  form.append("language", transcriptionLanguage);
 
   try {
     const res = await axios.post(`${ML_INFERENCE_URL}/transcribe`, form, {
@@ -34,7 +38,10 @@ async function transcribeAudio(file) {
       timeout: TRANSCRIPTION_TIMEOUT_MS,
     });
 
-    return res.data;
+    return {
+      ...res.data,
+      language: res.data?.language || transcriptionLanguage,
+    };
   } catch (error) {
     if (error.response) {
       console.error("Transcription server error:", error.response.status);

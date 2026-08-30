@@ -93,12 +93,25 @@ React MediaRecorder
   -> Express /api/journal/transcribe
   -> Python AI service /transcribe
   -> faster-whisper
-  -> editable journal textarea
-  -> existing Save Entry / GoEmotions flow
+  -> original-language editable journal textarea
+  -> Save Entry
+  -> server-side translation to English for hi/mr
+  -> GoEmotions emotion, sentiment, and risk analysis
+  -> PostgreSQL
 ```
 
 Audio is temporary. Express keeps the uploaded file in memory, and the Python
 service deletes its temporary Whisper input file after processing.
+
+Supported transcription and journal languages are:
+
+* English: `en`
+* Hindi: `hi`
+* Marathi: `mr`
+
+The database preserves original text in `journals.content`. Hindi and Marathi
+entries also store the English analysis translation in
+`journals.translated_content`; English entries keep that field empty.
 
 Install Python AI dependencies:
 
@@ -112,11 +125,27 @@ Manual transcription test:
 
 ```bash
 cd backend/python
-python test_transcription.py path\to\sample-english-audio.webm
+python test_transcription.py path\to\sample-audio.webm --language mr
 ```
 
-English is the only supported transcription language right now. Hindi and
-Marathi are reserved for future work.
+`WHISPER_MODEL_SIZE=tiny.en` preserves the existing English-only local setup.
+For Hindi or Marathi, configure a multilingual faster-whisper model such as
+`tiny`, `base`, `small`, `medium`, or `large`.
+
+Translation configuration is backend-only:
+
+```env
+TRANSLATION_PROVIDER=auto
+TRANSLATION_TIMEOUT_MS=20000
+TRANSLATION_API_KEY=
+LIBRETRANSLATE_URL=
+GEMINI_TRANSLATION_MODEL=gemini-1.5-flash
+```
+
+`auto` prefers LibreTranslate when `LIBRETRANSLATE_URL` is set, then Gemini
+when `GEMINI_API_KEY` is configured. If translation is unavailable for Hindi or
+Marathi, journal creation returns an error instead of analyzing untranslated
+text with the English-oriented model.
 
 ## Team
 

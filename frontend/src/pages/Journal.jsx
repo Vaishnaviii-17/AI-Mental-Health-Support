@@ -104,6 +104,12 @@ const VOICE_STATUS_LABELS = {
   error: "Speak",
 };
 
+const JOURNAL_LANGUAGES = {
+  en: { label: "English", shortLabel: "ENG" },
+  hi: { label: "Hindi", shortLabel: "HIN" },
+  mr: { label: "Marathi", shortLabel: "MAR" },
+};
+
 const MAX_RECORDING_MS = 2 * 60 * 1000;
 
 function JournalPage() {
@@ -115,6 +121,8 @@ function JournalPage() {
 
   const [voiceStatus, setVoiceStatus] = useState("idle");
   const [voiceError, setVoiceError] = useState("");
+  const [entryLanguage, setEntryLanguage] = useState("en");
+  const [showTranslatedJournal, setShowTranslatedJournal] = useState(false);
 
   const [form, setForm] = useState({
     title: "",
@@ -203,12 +211,14 @@ function JournalPage() {
       const created = await createJournal({
         title: form.title.trim(),
         content: form.content.trim(),
+        originalLanguage: entryLanguage,
       });
 
       const newEntry = created?.journal || created;
 
       setJournals((prev) => [newEntry, ...prev]);
       setForm({ title: "", content: "" });
+      setEntryLanguage("en");
       setSuccess(true);
 
       window.setTimeout(() => setSuccess(false), 3000);
@@ -253,7 +263,10 @@ function JournalPage() {
     setVoiceError("");
 
     try {
-      const transcript = await transcribeJournalAudio(audioBlob);
+      const transcript = await transcribeJournalAudio(
+        audioBlob,
+        entryLanguage
+      );
       const text = transcript?.text?.trim();
 
       if (!text) {
@@ -493,6 +506,19 @@ function JournalPage() {
     activeRiskAnalysis?.risk_score
   );
 
+  const activeOriginalLanguage =
+    activeJournal?.original_language || "en";
+  const activeLanguageMeta =
+    JOURNAL_LANGUAGES[activeOriginalLanguage] ||
+    JOURNAL_LANGUAGES.en;
+  const canToggleTranslation =
+    activeOriginalLanguage !== "en" &&
+    Boolean(activeJournal?.translated_content);
+  const activeJournalDisplayContent =
+    canToggleTranslation && showTranslatedJournal
+      ? activeJournal.translated_content
+      : activeJournal?.content;
+
   const characterCount = form.content.length;
 
   const isVoiceBusy =
@@ -571,6 +597,35 @@ function JournalPage() {
                       </label>
 
                       <div className="journal-textarea-tools">
+                        <div className="journal-language-select-group">
+                          <span className="journal-language-selected">
+                            {JOURNAL_LANGUAGES[entryLanguage].shortLabel}
+                          </span>
+
+                          <select
+                            value={entryLanguage}
+                            onChange={(event) =>
+                              setEntryLanguage(event.target.value)
+                            }
+                            className="journal-language-select"
+                            aria-label="Journal language"
+                            disabled={isVoiceBusy || submitting}
+                          >
+                            {Object.entries(JOURNAL_LANGUAGES).map(
+                              ([code, language]) => (
+                                <option key={code} value={code}>
+                                  {language.label}
+                                </option>
+                              )
+                            )}
+                          </select>
+
+                          <ChevronDown
+                            size={12}
+                            className="journal-language-select-arrow"
+                          />
+                        </div>
+
                         <button
                           type="button"
                           className={`journal-voice-btn journal-voice-btn--${voiceStatus}`}
@@ -643,6 +698,7 @@ function JournalPage() {
                       className="btn btn-ghost btn-compact"
                       onClick={() => {
                         setForm({ title: "", content: "" });
+                        setEntryLanguage("en");
                         setVoiceError("");
                       }}
                       disabled={submitting || isVoiceBusy}
@@ -792,7 +848,10 @@ function JournalPage() {
                         duration: 0.2,
                         delay: index * 0.03,
                       }}
-                      onClick={() => setActiveJournal(journal)}
+                      onClick={() => {
+                        setShowTranslatedJournal(false);
+                        setActiveJournal(journal);
+                      }}
                     >
                       <div className="journal-card-header">
                         <div className="journal-card-title-group">
@@ -910,8 +969,27 @@ function JournalPage() {
               </header>
 
               <div className="journal-modal-body">
+                {canToggleTranslation && (
+                  <button
+                    type="button"
+                    className="journal-translation-toggle"
+                    onClick={() =>
+                      setShowTranslatedJournal((current) => !current)
+                    }
+                    aria-label={
+                      showTranslatedJournal
+                        ? `Show original ${activeLanguageMeta.label} journal text`
+                        : "Show English translation"
+                    }
+                  >
+                    {showTranslatedJournal
+                      ? activeLanguageMeta.shortLabel
+                      : "ENG"}
+                  </button>
+                )}
+
                 <p className="journal-modal-content">
-                  {activeJournal.content}
+                  {activeJournalDisplayContent}
                 </p>
               </div>
 

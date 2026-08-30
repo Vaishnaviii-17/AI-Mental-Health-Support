@@ -97,6 +97,104 @@
   justify-content: flex-end;
 }
 
+.journal-language-select-group {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 58px;
+  height: 28px;
+
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+
+  overflow: hidden;
+}
+
+.journal-language-selected {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding-right: 10px;
+
+  color: var(--forest-700);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+
+  pointer-events: none;
+  z-index: 1;
+}
+
+.journal-language-select {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  border: none;
+  outline: none;
+  background: transparent;
+
+  /*
+   * Hide the native selected text.
+   * The visible ENG/HIN/MAR comes from .journal-language-selected.
+   */
+  opacity: 0;
+
+  cursor: pointer;
+
+  appearance: none;
+  -webkit-appearance: none;
+
+  z-index: 2;
+}
+
+.journal-language-select option {
+  color: var(--forest-700);
+  background: var(--white);
+
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+
+  opacity: 1;
+}
+
+.journal-language-select:focus {
+  outline: none;
+}
+
+.journal-language-select:disabled {
+  cursor: not-allowed;
+  opacity: 0;
+}
+
+.journal-language-select-arrow {
+  position: absolute;
+  right: 5px;
+
+  color: var(--text-faint);
+
+  pointer-events: none;
+  z-index: 3;
+}
+
+.journal-textarea-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 20px;
+}
+
 .journal-voice-btn {
   display: inline-flex;
   align-items: center;
@@ -530,6 +628,27 @@
 
 .journal-modal-body {
   margin-bottom: var(--space-md);
+}
+
+.journal-translation-toggle {
+  float: right;
+  margin: 0 0 var(--space-3xs) var(--space-xs);
+  min-width: 42px;
+  min-height: 26px;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-soft);
+  background: var(--sage-50);
+  color: var(--forest-700);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  transition: background-color 0.18s, border-color 0.18s;
+}
+
+.journal-translation-toggle:hover {
+  background: var(--white);
+  border-color: rgba(27, 67, 50, 0.22);
 }
 
 .journal-modal-content {
