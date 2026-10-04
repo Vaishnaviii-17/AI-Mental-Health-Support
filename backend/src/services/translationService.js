@@ -1,194 +1,429 @@
 const axios = require("axios");
+
 const {
   assertSupportedLanguage,
   DEFAULT_LANGUAGE,
 } = require("../utils/language");
 
-const TRANSLATION_PROVIDER = (
-  process.env.TRANSLATION_PROVIDER || "auto"
-).trim().toLowerCase();
 
-const TRANSLATION_TIMEOUT_MS =
-  Number(process.env.TRANSLATION_TIMEOUT_MS) || 20000;
+// ============================================================
+// CONFIGURATION
+// ============================================================
 
-const LIBRETRANSLATE_URL = (
-  process.env.LIBRETRANSLATE_URL || ""
-).trim().replace(/\/$/, "");
+// Python inference server.
+// Your Flask /translate endpoint runs here.
+const ML_INFERENCE_URL = (
+  process.env.ML_INFERENCE_URL ||
+  "http://127.0.0.1:5001"
+)
+  .trim()
+  .replace(/\/$/, "");
 
-const TRANSLATION_API_KEY = (
-  process.env.TRANSLATION_API_KEY || ""
-).trim();
 
+// NLLB may take longer on the first request because the
+// model is lazy-loaded into GPU memory.
+const NLLB_TRANSLATION_TIMEOUT_MS =
+  Number(process.env.NLLB_TRANSLATION_TIMEOUT_MS) ||
+  120000;
+
+
+// Gemini is fallback only.
 const GEMINI_API_KEY = (
   process.env.GEMINI_API_KEY || ""
 ).trim();
 
-const GEMINI_TRANSLATION_MODEL =
-  process.env.GEMINI_TRANSLATION_MODEL || "gemini-2.5-flash";
+const GEMINI_TRANSLATION_MODEL = (
+  process.env.GEMINI_TRANSLATION_MODEL ||
+  "gemini-3.8-flash"
+).trim();
+
+const GEMINI_TRANSLATION_TIMEOUT_MS =
+  Number(process.env.TRANSLATION_TIMEOUT_MS) ||
+  20000;
+
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function createTranslationError(
+  message,
+  statusCode = 503
+) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  return error;
+}
+
 
 function hasUsableGeminiKey() {
-  return Boolean(GEMINI_API_KEY && GEMINI_API_KEY !== "your_gemini_api_key");
+  return Boolean(
+    GEMINI_API_KEY &&
+    GEMINI_API_KEY !== "your_gemini_api_key"
+  );
 }
 
-function resolveProvider() {
-  if (TRANSLATION_PROVIDER && TRANSLATION_PROVIDER !== "auto") {
-    return TRANSLATION_PROVIDER;
-  }
 
-  if (LIBRETRANSLATE_URL) return "libretranslate";
-  if (hasUsableGeminiKey()) return "gemini";
+// ============================================================
+// PRIMARY PROVIDER: NLLB-200
+// ============================================================
 
-  return "disabled";
-}
+async function translateWithNLLB(
+  text,
+  sourceLanguage
+) {
+  const url =
+    `${ML_INFERENCE_URL}/translate`;
 
-function createTranslationError(message, statusCode = 503) {
-  const err = new Error(message);
-  err.statusCode = statusCode;
-  return err;
-}
-
-async function translateWithLibreTranslate(text, sourceLanguage) {
-  if (!LIBRETRANSLATE_URL) {
-    throw createTranslationError(
-      "LibreTranslate URL is not configured. Set LIBRETRANSLATE_URL or choose another TRANSLATION_PROVIDER."
-    );
-  }
-
-  const payload = {
-    q: text,
-    source: sourceLanguage,
-    target: "en",
-    format: "text",
-  };
-
-  if (TRANSLATION_API_KEY) {
-    payload.api_key = TRANSLATION_API_KEY;
-  }
-
-  const res = await axios.post(
-    `${LIBRETRANSLATE_URL}/translate`,
-    payload,
-    {
-      headers: { "Content-Type": "application/json" },
-      timeout: TRANSLATION_TIMEOUT_MS,
-    }
+  console.log("");
+  console.log(
+    "=============================================="
+  );
+  console.log(
+    "[TRANSLATION] PRIMARY PROVIDER: NLLB-200"
+  );
+  console.log(
+    `[TRANSLATION] Source language: ${sourceLanguage}`
+  );
+  console.log(
+    `[TRANSLATION] Endpoint: ${url}`
+  );
+  console.log(
+    "=============================================="
   );
 
-  const translatedText = res.data?.translatedText;
+  try {
+    const response = await axios.post(
+      url,
+      {
+        text,
+        source_language: sourceLanguage,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        timeout: NLLB_TRANSLATION_TIMEOUT_MS,
+      }
+    );
 
-  if (!translatedText || !String(translatedText).trim()) {
-    throw createTranslationError("Translation service returned an empty result.");
+    const translatedText =
+      response.data?.translated_text ||
+      response.data?.text;
+
+    if (
+      !translatedText ||
+      !String(translatedText).trim()
+    ) {
+      throw new Error(
+        "NLLB returned an empty translation."
+      );
+    }
+
+    const cleanedTranslation =
+      String(translatedText).trim();
+
+    console.log(
+      "[TRANSLATION] NLLB SUCCESS:",
+      cleanedTranslation
+    );
+
+    console.log(
+      "[TRANSLATION] Provider returned by Python:",
+      response.data?.provider || "nllb-200"
+    );
+
+    return cleanedTranslation;
+
+  } catch (error) {
+    console.error(
+      "[TRANSLATION] NLLB FAILED:",
+      error.message
+    );
+
+    if (error.response) {
+      console.error(
+        "[TRANSLATION] NLLB HTTP status:",
+        error.response.status
+      );
+
+      console.error(
+        "[TRANSLATION] NLLB response:",
+        error.response.data
+      );
+    }
+
+    throw error;
   }
-
-  return String(translatedText).trim();
 }
 
-async function translateWithGemini(text, sourceLanguage) {
+
+// ============================================================
+// FALLBACK PROVIDER: GEMINI
+// ============================================================
+
+async function translateWithGemini(
+  text,
+  sourceLanguage
+) {
   if (!hasUsableGeminiKey()) {
-    throw createTranslationError(
-      "Gemini translation is not configured. Set GEMINI_API_KEY or choose another TRANSLATION_PROVIDER."
+    throw new Error(
+      "Gemini fallback is not configured."
     );
   }
 
-  const sourceName = sourceLanguage === "hi" ? "Hindi" : "Marathi";
+  let sourceName;
+
+  if (sourceLanguage === "hi") {
+    sourceName = "Hindi";
+  } else if (sourceLanguage === "mr") {
+    sourceName = "Marathi";
+  } else {
+    sourceName = sourceLanguage;
+  }
+
   const prompt = [
-    `Translate the following ${sourceName} journal entry to natural English.`,
-    "Return only the translated English text. Do not add commentary.",
+    `Translate the following ${sourceName} journal entry into natural English.`,
+    "Preserve the original emotional meaning and intensity.",
+    "Return only the English translation.",
+    "Do not add explanations, labels, or commentary.",
     "",
     text,
   ].join("\n");
 
   const url =
-    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_TRANSLATION_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    "https://generativelanguage.googleapis.com/v1beta/models/" +
+    `${GEMINI_TRANSLATION_MODEL}:generateContent` +
+    `?key=${GEMINI_API_KEY}`;
 
-  const res = await axios.post(
-    url,
-    {
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0,
-      },
-    },
-    {
-      headers: { "Content-Type": "application/json" },
-      timeout: TRANSLATION_TIMEOUT_MS,
-    }
+  console.log("");
+  console.log(
+    "=============================================="
+  );
+  console.log(
+    "[TRANSLATION] FALLBACK PROVIDER: GEMINI"
+  );
+  console.log(
+    `[TRANSLATION] Gemini model: ${GEMINI_TRANSLATION_MODEL}`
+  );
+  console.log(
+    `[TRANSLATION] Source language: ${sourceLanguage}`
+  );
+  console.log(
+    "=============================================="
   );
 
-  const translatedText =
-    res.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  try {
+    const response = await axios.post(
+      url,
+      {
+        contents: [
+          {
+            parts: [
+              {
+                text: prompt,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0,
+        },
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+        },
+        timeout:
+          GEMINI_TRANSLATION_TIMEOUT_MS,
+      }
+    );
 
-  if (!translatedText || !String(translatedText).trim()) {
-    throw createTranslationError("Translation service returned an empty result.");
+    const translatedText =
+      response.data?.candidates?.[0]
+        ?.content?.parts?.[0]?.text;
+
+    if (
+      !translatedText ||
+      !String(translatedText).trim()
+    ) {
+      throw new Error(
+        "Gemini returned an empty translation."
+      );
+    }
+
+    const cleanedTranslation =
+      String(translatedText).trim();
+
+    console.log(
+      "[TRANSLATION] GEMINI FALLBACK SUCCESS:",
+      cleanedTranslation
+    );
+
+    return cleanedTranslation;
+
+  } catch (error) {
+    console.error(
+      "[TRANSLATION] GEMINI FALLBACK FAILED:",
+      error.message
+    );
+
+    if (error.response) {
+      console.error(
+        "[TRANSLATION] Gemini HTTP status:",
+        error.response.status
+      );
+
+      console.error(
+        "[TRANSLATION] Gemini response:",
+        error.response.data
+      );
+    }
+
+    throw error;
   }
-
-  return String(translatedText).trim();
 }
 
-async function translateToEnglish(text, sourceLanguage = DEFAULT_LANGUAGE) {
-  if (typeof text !== "string" || !text.trim()) {
-    throw createTranslationError("Text is required for translation.", 400);
+
+// ============================================================
+// MAIN TRANSLATION FUNCTION
+// ============================================================
+
+async function translateToEnglish(
+  text,
+  sourceLanguage = DEFAULT_LANGUAGE
+) {
+  // ----------------------------------------------------------
+  // Validate text
+  // ----------------------------------------------------------
+
+  if (
+    typeof text !== "string" ||
+    !text.trim()
+  ) {
+    throw createTranslationError(
+      "Text is required for translation.",
+      400
+    );
   }
 
-  const normalizedLanguage = assertSupportedLanguage(sourceLanguage);
-  const cleanedText = text.trim();
+  const cleanedText =
+    text.trim();
 
-  if (normalizedLanguage === DEFAULT_LANGUAGE) {
+  // Use the project's existing language validation.
+  const normalizedLanguage =
+    assertSupportedLanguage(
+      sourceLanguage
+    );
+
+
+  // ----------------------------------------------------------
+  // ENGLISH → BYPASS
+  // ----------------------------------------------------------
+
+  if (
+    normalizedLanguage ===
+    DEFAULT_LANGUAGE
+  ) {
+    console.log(
+      "[TRANSLATION] English input detected. Translation bypassed."
+    );
+
     return {
       text: cleanedText,
       translatedText: null,
-      sourceLanguage: normalizedLanguage,
+      sourceLanguage:
+        normalizedLanguage,
       provider: "bypass",
     };
   }
 
-  const provider = resolveProvider();
 
-  if (provider === "disabled") {
-    throw createTranslationError(
-      "Translation is not configured. Set TRANSLATION_PROVIDER with a supported provider before saving Hindi or Marathi journals."
-    );
-  }
+  // ----------------------------------------------------------
+  // PRIMARY → NLLB
+  // ----------------------------------------------------------
 
   try {
-    const translatedText =
-      provider === "libretranslate"
-        ? await translateWithLibreTranslate(cleanedText, normalizedLanguage)
-        : provider === "gemini"
-          ? await translateWithGemini(cleanedText, normalizedLanguage)
-          : null;
+    console.log(
+      `[TRANSLATION] Trying NLLB first for ${normalizedLanguage}...`
+    );
 
-    if (!translatedText) {
-      throw createTranslationError(
-        `Unsupported translation provider: ${provider}`,
-        400
+    const translatedText =
+      await translateWithNLLB(
+        cleanedText,
+        normalizedLanguage
       );
-    }
+
+    console.log(
+      "[TRANSLATION] Primary NLLB translation completed successfully."
+    );
 
     return {
       text: translatedText,
       translatedText,
-      sourceLanguage: normalizedLanguage,
-      provider,
+      sourceLanguage:
+        normalizedLanguage,
+      provider: "nllb-200",
     };
-  } catch (error) {
-    if (error.statusCode) throw error;
 
-    if (error.response) {
-      console.error(
-        "Translation provider error:",
-        error.response.status,
-        error.response.data
+  } catch (nllbError) {
+    console.warn(
+      "[TRANSLATION] Primary NLLB translation failed."
+    );
+
+    console.warn(
+      `[TRANSLATION] NLLB reason: ${nllbError.message}`
+    );
+
+    console.warn(
+      "[TRANSLATION] Attempting Gemini fallback..."
+    );
+  }
+
+
+  // ----------------------------------------------------------
+  // FALLBACK → GEMINI
+  // ----------------------------------------------------------
+
+  try {
+    const translatedText =
+      await translateWithGemini(
+        cleanedText,
+        normalizedLanguage
       );
-    } else {
-      console.error("Translation failed:", error.message);
-    }
+
+    console.log(
+      "[TRANSLATION] Gemini fallback completed successfully."
+    );
+
+    return {
+      text: translatedText,
+      translatedText,
+      sourceLanguage:
+        normalizedLanguage,
+      provider: "gemini-fallback",
+    };
+
+  } catch (geminiError) {
+    console.error(
+      "[TRANSLATION] Both NLLB and Gemini translation failed."
+    );
+
+    console.error(
+      `[TRANSLATION] Gemini fallback reason: ${geminiError.message}`
+    );
 
     throw createTranslationError(
-      "Unable to translate this journal entry for AI analysis. Please try again later."
+      "Unable to translate this journal entry for AI analysis. Please try again later.",
+      503
     );
   }
 }
+
+
+// ============================================================
+// EXPORTS
+// ============================================================
 
 module.exports = {
   translateToEnglish,

@@ -8,6 +8,7 @@ Endpoints:
     GET  /health
     POST /predict
     POST /chat
+    POST /translate
     POST /transcribe
 
 /predict
@@ -33,6 +34,11 @@ Node.js communicates with this server over HTTP.
 import os
 import tempfile
 
+# Explicitly add the cublas bin directory to the Windows DLL path and system PATH
+cublas_bin = r"C:\Projects\AI-Mental-Health-Support-main\backend\python\.venv\Lib\site-packages\nvidia\cublas\bin"
+os.add_dll_directory(cublas_bin)
+os.environ["PATH"] = cublas_bin + os.path.pathsep + os.environ["PATH"]
+
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -47,7 +53,7 @@ from werkzeug.utils import secure_filename
 
 from inference.predictor import MentalHealthPredictor
 from inference.transcription_service import TranscriptionService
-
+from inference.nllb_translator import NLLBTranslator
 # Response generator is responsible for generating the natural-language
 # conversational response.
 try:
@@ -68,6 +74,10 @@ print("Initializing Python inference services...")
 predictor = MentalHealthPredictor()
 transcription_service = TranscriptionService()
 
+# NLLB is lazy-loaded only when Hindi/Marathi translation is requested.
+# This avoids consuming GPU memory during server startup.
+nllb_translator = None
+
 response_generator = None
 
 if ResponseGenerator is not None:
@@ -85,7 +95,15 @@ else:
         "Chat responses will use a basic fallback."
     )
 
+def get_nllb_translator():
+    global nllb_translator
 
+    if nllb_translator is None:
+        print("Initializing NLLB-200 translation service...")
+        nllb_translator = NLLBTranslator()
+        print("NLLB-200 translation service ready.")
+
+    return nllb_translator
 # ============================================================
 # AUDIO CONFIGURATION
 # ============================================================
@@ -486,7 +504,101 @@ def chat():
             "error": "Chat inference failed"
         }), 500
 
+# ============================================================
+# TRANSLATION
+# ============================================================
 
+@app.post("/translate")
+def translate():
+    """
+    Translate Hindi or Marathi text into English using
+    the local NLLB-200 model.
+
+    English input is returned unchanged.
+    """
+
+    try:
+        data = request.get_json()
+
+        if not data:
+            return jsonify({
+                "error": "Request body is required"
+            }), 400
+
+        text = data.get("text")
+
+        if not isinstance(text, str):
+            return jsonify({
+                "error": "text must be a string"
+            }), 400
+
+        text = text.strip()
+
+        if not text:
+            return jsonify({
+                "error": "text cannot be empty"
+            }), 400
+
+        source_language = str(
+            data.get("source_language", "en")
+        ).strip().lower()
+
+        if source_language not in {"en", "hi", "mr"}:
+            return jsonify({
+                "error": (
+                    "unsupported source language. "
+                    "Supported languages are: en, hi, mr"
+                )
+            }), 400
+
+        # English does not need translation.
+        if source_language == "en":
+            return jsonify({
+                "success": True,
+                "text": text,
+                "translated_text": None,
+                "source_language": "en",
+                "target_language": "en",
+                "provider": "bypass",
+            })
+
+        translator = get_nllb_translator()
+
+        translated_text = translator.translate_to_english(
+            text=text,
+            source_language=source_language,
+        )
+
+        if not translated_text:
+            return jsonify({
+                "error": "Translation returned an empty result"
+            }), 500
+
+        return jsonify({
+            "success": True,
+            "text": translated_text,
+            "translated_text": translated_text,
+            "source_language": source_language,
+            "target_language": "en",
+            "provider": "nllb-200",
+        })
+
+    except ValueError as e:
+
+        return jsonify({
+            "error": str(e)
+        }), 400
+
+    except Exception as e:
+
+        print(
+            f"NLLB translation error: "
+            f"{type(e).__name__}: {e}"
+        )
+
+        return jsonify({
+            "error": "Translation failed"
+        }), 500
 # ============================================================
 # TRANSCRIPTION
 # ============================================================
