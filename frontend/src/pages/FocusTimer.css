@@ -1,3 +1,4 @@
+/* ─── Page layout ─────────────────────────────────────────────────────────── */
 .focus-timer-page {
   min-height: calc(100vh - var(--nav-height));
   display: grid;
@@ -5,9 +6,10 @@
   padding: var(--space-xl) 0;
 }
 
+/* ─── Timer card ──────────────────────────────────────────────────────────── */
 .focus-timer {
   display: grid;
-  grid-template-columns: minmax(190px, 0.7fr) minmax(0, 1.3fr);
+  grid-template-columns: minmax(200px, 0.75fr) minmax(0, 1.25fr);
   align-items: center;
   gap: var(--space-lg);
   padding: var(--space-xl);
@@ -17,28 +19,298 @@
   background: radial-gradient(100% 150% at 100% 0%, var(--forest-500), var(--forest-800) 58%, var(--forest-900));
   box-shadow: var(--shadow-lg);
 }
-.focus-timer--break { background: radial-gradient(100% 150% at 100% 0%, #208c8d, #116466 58%, #0c474a); }
-.focus-timer__intro h2 { margin-top: var(--space-xs); color: var(--cream-100); font-size: var(--fs-2xl); }
-.focus-timer__intro p { max-width: 240px; margin-top: var(--space-sm); color: var(--text-on-dark-muted); font-size: var(--fs-sm); }
-.focus-timer__main { display: grid; justify-items: center; padding: var(--space-md); border: 1px solid var(--border-on-dark); border-radius: var(--radius-lg); background: rgba(255, 255, 255, 0.06); }
-.focus-timer__mode { color: var(--sage-100); font-size: var(--fs-xs); font-weight: 800; letter-spacing: 0.13em; text-transform: uppercase; }
+.focus-timer--break {
+  background: radial-gradient(100% 150% at 100% 0%, #208c8d, #116466 58%, #0c474a);
+}
+.focus-timer--done {
+  background: radial-gradient(100% 150% at 100% 0%, #4a7c6b, #2d5a48 58%, #1a3d30);
+}
+
+/* ─── Left: intro col ─────────────────────────────────────────────────────── */
+.focus-timer__intro h2 {
+  margin-top: var(--space-xs);
+  color: var(--cream-100);
+  font-size: var(--fs-2xl);
+}
+.focus-timer__intro p {
+  max-width: 240px;
+  margin-top: var(--space-sm);
+  color: var(--text-on-dark-muted);
+  font-size: var(--fs-sm);
+}
+
+/* Session progress dots */
+.focus-timer__dots {
+  display: flex;
+  gap: 10px;
+  margin-top: var(--space-md);
+}
+.focus-timer__dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  transition: background 0.3s, border-color 0.3s, transform 0.2s;
+}
+.focus-timer__dot--done {
+  background: #9bd89e;
+  border-color: #9bd89e;
+}
+.focus-timer__dot--active {
+  background: #f3a35c;
+  border-color: #f3a35c;
+  transform: scale(1.25);
+  box-shadow: 0 0 0 3px rgba(243, 163, 92, 0.3);
+}
+.focus-timer--break .focus-timer__dot--active {
+  background: #c9f0e6;
+  border-color: #c9f0e6;
+  box-shadow: 0 0 0 3px rgba(201, 240, 230, 0.3);
+}
+
+.focus-timer__session-label {
+  margin-top: var(--space-xs) !important;
+  font-size: var(--fs-2xs) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(250, 246, 240, 0.55) !important;
+}
+
+/* ─── Right: timer display col ───────────────────────────────────────────── */
+.focus-timer__main {
+  display: grid;
+  justify-items: center;
+  padding: var(--space-md);
+  border: 1px solid var(--border-on-dark);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.focus-timer__mode {
+  color: var(--sage-100);
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
 .focus-timer--break .focus-timer__mode { color: #c9f0e6; }
-.focus-timer__display { margin: var(--space-2xs) 0 0; color: var(--cream-100); font-family: var(--font-body); font-size: 96px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.07em; }
-.focus-timer__session { margin-top: var(--space-xs); color: var(--text-on-dark-muted); font-size: var(--fs-xs); font-weight: 700; }
-.focus-timer__controls { display: flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: 46px; margin-top: var(--space-md); }
-.focus-timer__start { min-width: 112px; padding: 0.72rem 1.25rem; color: #5a260d; border-radius: var(--radius-full); background: #f3a35c; font-size: var(--fs-xs); font-weight: 800; transition: transform var(--dur-fast), background var(--dur-fast); }
-.focus-timer__start--running { color: #123d28; background: #9bd89e; }
+.focus-timer--done  .focus-timer__mode { color: #9bd89e; }
+
+/* ─── Circular progress ring ─────────────────────────────────────────────── */
+.focus-timer__ring-wrap {
+  position: relative;
+  width: 200px;
+  height: 200px;
+  margin: var(--space-sm) 0 var(--space-xs);
+}
+.focus-timer__ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.focus-timer__ring-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 5;
+}
+.focus-timer__ring-fill {
+  fill: none;
+  stroke: #f3a35c;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 339.3; /* 2π × 54 */
+  stroke-dashoffset: 339.3;
+  transition: stroke-dashoffset 0.6s var(--ease-organic),
+              stroke 0.4s ease;
+}
+.focus-timer--break .focus-timer__ring-fill { stroke: #c9f0e6; }
+.focus-timer--done  .focus-timer__ring-fill { stroke: #9bd89e; }
+
+/* Countdown number overlaid on the ring */
+.focus-timer__display {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cream-100);
+  font-family: var(--font-body);
+  font-size: 3rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+/* ─── Controls ────────────────────────────────────────────────────────────── */
+.focus-timer__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 46px;
+  margin-top: var(--space-sm);
+}
+.focus-timer__start {
+  min-width: 112px;
+  padding: 0.72rem 1.25rem;
+  color: #5a260d;
+  border-radius: var(--radius-full);
+  background: #f3a35c;
+  font-size: var(--fs-xs);
+  font-weight: 800;
+  transition: transform var(--dur-fast), background var(--dur-fast);
+}
+.focus-timer__start--running {
+  color: #123d28;
+  background: #9bd89e;
+}
 .focus-timer__start:hover { transform: translateY(-2px); }
-.focus-timer__icon-button { display: grid; width: 42px; height: 42px; place-items: center; color: var(--cream-100); border: 1px solid var(--border-on-dark); border-radius: 50%; background: rgba(255, 255, 255, 0.07); }
+.focus-timer__icon-button {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  color: var(--cream-100);
+  border: 1px solid var(--border-on-dark);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.07);
+  transition: background var(--dur-fast);
+}
 .focus-timer__icon-button:hover { background: rgba(255, 255, 255, 0.16); }
 
+/* ─── Cycle complete state ─────────────────────────────────────────────────── */
+.focus-timer__complete {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+}
+.focus-timer__check {
+  width: 64px;
+  height: 64px;
+  margin-top: var(--space-xs);
+}
+.focus-timer__check circle {
+  stroke: #9bd89e;
+  stroke-width: 2.5;
+}
+.focus-timer__check path {
+  stroke: #9bd89e;
+  stroke-width: 3;
+  stroke-dasharray: 40;
+  stroke-dashoffset: 0;
+  animation: ft-draw-check 0.5s var(--ease-organic) both;
+}
+@keyframes ft-draw-check {
+  from { stroke-dashoffset: 40; }
+  to   { stroke-dashoffset: 0; }
+}
+.focus-timer__complete-msg {
+  color: var(--text-on-dark-muted);
+  font-size: var(--fs-sm);
+  text-align: center;
+  line-height: 1.5;
+  max-width: 280px;
+}
+/* "Start New Cycle" reuses the same .focus-timer__start class — already styled */
+
+/* ─── Navigation warning modal ────────────────────────────────────────────── */
+.ft-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 43, 33, 0.6);
+  backdrop-filter: blur(4px);
+  padding: var(--space-md);
+  animation: ft-fade-in 0.18s ease;
+}
+@keyframes ft-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.ft-modal {
+  background: var(--cream-100);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-lg) var(--space-xl);
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  animation: ft-slide-up 0.22s var(--ease-organic);
+}
+@keyframes ft-slide-up {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.ft-modal__eyebrow {
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-600);
+  margin-bottom: var(--space-2xs);
+}
+.ft-modal__title {
+  font-size: var(--fs-lg);
+  color: var(--text-primary);
+  margin-bottom: var(--space-xs);
+}
+.ft-modal__body {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: var(--space-md);
+}
+.ft-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.ft-modal__btn {
+  width: 100%;
+  padding: 0.85rem 1.5rem;
+  border-radius: var(--radius-full);
+  font-family: var(--font-body);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: transform var(--dur-fast), background var(--dur-fast);
+}
+.ft-modal__btn:hover { transform: translateY(-1px); }
+.ft-modal__btn--primary {
+  background: var(--forest-700);
+  color: var(--cream-100);
+}
+.ft-modal__btn--primary:hover { background: var(--forest-600); }
+.ft-modal__btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1.5px solid var(--border-soft);
+}
+.ft-modal__btn--ghost:hover {
+  background: var(--sage-50);
+  border-color: var(--forest-700);
+  color: var(--text-primary);
+}
+
+/* ─── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 760px) {
-  .focus-timer-page { align-items: start; padding: var(--space-md) 0; }
-  .focus-timer { grid-template-columns: 1fr; padding: var(--space-lg); gap: var(--space-md); }
+  .focus-timer-page  { align-items: start; padding: var(--space-md) 0; }
+  .focus-timer       { grid-template-columns: 1fr; padding: var(--space-lg); gap: var(--space-md); }
   .focus-timer__intro { text-align: center; }
   .focus-timer__intro p { margin-inline: auto; }
+  .focus-timer__dots  { justify-content: center; }
 }
 @media (max-width: 480px) {
-  .focus-timer__main { padding: var(--space-sm); }
-  .focus-timer__display { font-size: clamp(4rem, 22vw, 6rem); }
+  .focus-timer__main       { padding: var(--space-sm); }
+  .focus-timer__ring-wrap  { width: 170px; height: 170px; }
+  .focus-timer__display    { font-size: 2.4rem; }
+  .ft-modal                { padding: var(--space-md); }
 }

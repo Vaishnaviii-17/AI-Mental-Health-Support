@@ -137,7 +137,7 @@ async function getBestStats(userId, activityType) {
     return rows[0];
   }
 
-  if (activityType === "breathing_bubble") {
+  if (activityType === "breathing_bubble" || activityType === "guided_meditation" || activityType === "calming_music") {
     const query = `
       SELECT
         COALESCE(MAX(score), 0)::int as "bestCompletion",

@@ -63,6 +63,12 @@
   border: 1px solid #bbf7d0;
 }
 
+.journal-alert--warning {
+  background-color: #fffbeb;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
 .journal-state-container {
   display: flex;
   flex-direction: column;
@@ -1326,6 +1332,47 @@
 }
 
 /* ==========================================================
+   Voice Mood Signals (multimodal analysis)
+   Rendered immediately, like Risk Screening: no delayed motion.
+   ========================================================== */
+.journal-voice-analysis-panel {
+  margin-top: var(--space-3xs);
+  padding: var(--space-sm);
+  border: 1px solid var(--border-soft);
+  border-left: 3px solid rgba(27, 67, 50, 0.22);
+  border-radius: 8px;
+  background-color: var(--white);
+}
+
+.journal-analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+  margin-bottom: var(--space-3xs);
+}
+
+.analysis-item {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.analysis-item span {
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.analysis-item strong {
+  font-size: var(--fs-xs);
+  color: var(--forest-700);
+  overflow-wrap: anywhere;
+}
+
+.journal-voice-analysis-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* ==========================================================
    Archive Toolbar
    ========================================================== */
 .journal-archive-toolbar {
@@ -1641,6 +1688,10 @@
   }
 
   .journal-alert {
+    animation: none;
+  }
+
+  .journal-voice-spin {
     animation: none;
   }
 

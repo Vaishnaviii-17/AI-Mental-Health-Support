@@ -34,11 +34,6 @@ Node.js communicates with this server over HTTP.
 import os
 import tempfile
 
-# Explicitly add the cublas bin directory to the Windows DLL path and system PATH
-cublas_bin = r"C:\Projects\AI-Mental-Health-Support-main\backend\python\.venv\Lib\site-packages\nvidia\cublas\bin"
-os.add_dll_directory(cublas_bin)
-os.environ["PATH"] = cublas_bin + os.path.pathsep + os.environ["PATH"]
-
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -54,6 +49,9 @@ from werkzeug.utils import secure_filename
 from inference.predictor import MentalHealthPredictor
 from inference.transcription_service import TranscriptionService
 from inference.nllb_translator import NLLBTranslator
+from speech_emotion.fusion import fuse_emotions
+from speech_emotion.mapping import map_goemotions_to_common
+from speech_emotion.model import SpeechEmotionService
 # Response generator is responsible for generating the natural-language
 # conversational response.
 try:
@@ -73,6 +71,7 @@ print("Initializing Python inference services...")
 
 predictor = MentalHealthPredictor()
 transcription_service = TranscriptionService()
+speech_emotion_service = SpeechEmotionService()
 
 # NLLB is lazy-loaded only when Hindi/Marathi translation is requested.
 # This avoids consuming GPU memory during server startup.
@@ -718,6 +717,159 @@ def transcribe():
                     "Temporary transcription "
                     "audio cleanup failed."
                 )
+
+
+# ============================================================
+# VOICE JOURNAL MULTIMODAL ANALYSIS
+# ============================================================
+
+@app.post("/voice-journal/analyze")
+def analyze_voice_journal():
+    """
+    Analyze an edited voice-journal transcript with the existing
+    GoEmotions/risk pipeline and, independently, the original audio
+    with Wav2Vec2 speech emotion recognition.
+
+    Risk stays separate from emotion fusion. A speech-emotion failure
+    never cancels the transcript/text/risk result.
+    """
+
+    temp_path = None
+
+    try:
+        text = request.form.get("text")
+
+        if not isinstance(text, str):
+            return jsonify({
+                "error": "text must be a string"
+            }), 400
+
+        text = text.strip()
+
+        if not text:
+            return jsonify({
+                "error": "text cannot be empty"
+            }), 400
+
+        audio = request.files.get("audio")
+        validation_error = _validate_audio_upload(audio)
+
+        if validation_error:
+            return jsonify({
+                "error": validation_error
+            }), 400
+
+        content_length = request.content_length or 0
+
+        if content_length > AUDIO_MAX_BYTES:
+            return jsonify({
+                "error": "audio file is too large"
+            }), 413
+
+        suffix = "." + _extension(audio.filename)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            audio.save(temp_file)
+            temp_path = temp_file.name
+
+        file_size = os.path.getsize(temp_path)
+
+        if file_size <= 0:
+            return jsonify({
+                "error": "audio file is empty"
+            }), 400
+
+        if file_size > AUDIO_MAX_BYTES:
+            return jsonify({
+                "error": "audio file is too large"
+            }), 413
+
+        analysis = predictor.analyze(text)
+        text_common = map_goemotions_to_common(
+            analysis.get("goemotions", {}).get("probabilities", {})
+        )
+
+        voice_emotion = None
+        voice_error = None
+        fusion_result = None
+
+        try:
+            voice_emotion = speech_emotion_service.analyze(temp_path)
+            fusion_result = fuse_emotions(
+                text_common,
+                voice_emotion.get("probabilities", {}),
+            )
+        except ValueError as e:
+            voice_error = str(e)
+            print(
+                "Speech emotion unavailable: "
+                f"{type(e).__name__}: {e}"
+            )
+        except Exception as e:
+            voice_error = "Speech emotion analysis unavailable"
+            print(
+                "Speech emotion analysis failed: "
+                f"{type(e).__name__}: {e}"
+            )
+
+        if fusion_result is None:
+            fusion_result = {
+                "textEmotion": {
+                    "dominant": max(text_common.items(), key=lambda item: item[1])[0],
+                    "probabilities": text_common,
+                    "confidence": max(text_common.values()),
+                },
+                "mismatch": None,
+                "fusion": {
+                    "method": "text_only_fallback",
+                    "finalMood": analysis.get("emotion", {}).get("label") or "neutral",
+                    "displayLabel": analysis.get("emotion", {}).get("label") or "Neutral",
+                    "probabilities": text_common,
+                    "weights": {
+                        "text": 1.0,
+                        "voice": 0.0,
+                    },
+                },
+            }
+
+        return jsonify({
+            "transcript": text,
+            "analysis": analysis,
+            "textEmotion": fusion_result["textEmotion"],
+            "voiceEmotion": voice_emotion,
+            "voiceEmotionError": voice_error,
+            "mismatch": fusion_result["mismatch"],
+            "fusion": fusion_result["fusion"],
+            "risk": analysis.get("risk"),
+            "language": request.form.get("language") or "en",
+            "speechEmotionLanguageNote": (
+                "The speech-emotion model analyzes the original acoustic "
+                "signal. It is primarily intended for English and is not "
+                "equally validated for Hindi or Marathi."
+            ),
+        })
+
+    except ValueError as e:
+        return jsonify({
+            "error": str(e)
+        }), 400
+
+    except Exception as e:
+        print(
+            f"Voice journal analysis error: "
+            f"{type(e).__name__}: {e}"
+        )
+
+        return jsonify({
+            "error": "Voice journal analysis failed"
+        }), 500
+
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except OSError:
+                print("Temporary voice-journal audio cleanup failed.")
 
 
 # ============================================================

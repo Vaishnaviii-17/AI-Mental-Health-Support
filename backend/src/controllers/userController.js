@@ -3,6 +3,16 @@ const { hashPassword, comparePassword } = require("../utils/password");
 const response = require("../utils/response");
 const asyncHandler = require("../utils/asyncHandler");
 
+const ALLOWED_AVATAR_IDS = [
+  "lotus", "leaf", "mountain", "moon", "wave",
+  "sun", "butterfly", "river", "cloud", "star",
+];
+
+const ALLOWED_INTENTIONS = [
+  "relaxation", "focus_clarity", "mindfulness",
+  "mood_awareness", "self_compassion", "better_habits",
+];
+
 /**
  * Get profile details of the current user
  */
@@ -12,12 +22,13 @@ const getProfile = asyncHandler(async (req, res) => {
     return res.status(404).json(response.error("User not found"));
   }
 
-  // Format response matching profile view requirements
   res.status(200).json(response.success("Profile fetched successfully", {
     id: user.id,
     username: user.username,
     fullName: user.full_name || "",
     email: user.email || "",
+    avatarId: user.avatar_id || "lotus",
+    intentions: user.intentions || [],
     memberSince: user.created_at,
   }));
 });
@@ -58,6 +69,42 @@ const updateProfile = asyncHandler(async (req, res) => {
     fullName: updatedUser.full_name,
     email: updatedUser.email,
     memberSince: updatedUser.created_at,
+  }));
+});
+
+/**
+ * Update personalization preferences: avatar_id and intentions.
+ * Both values are validated against server-side allowlists.
+ */
+const updatePersonalization = asyncHandler(async (req, res) => {
+  const { avatarId, intentions } = req.body;
+
+  // Validate avatar_id
+  if (!avatarId || !ALLOWED_AVATAR_IDS.includes(avatarId)) {
+    return res.status(400).json(response.error(
+      `Invalid avatar. Allowed values: ${ALLOWED_AVATAR_IDS.join(", ")}`
+    ));
+  }
+
+  // Validate intentions array
+  if (!Array.isArray(intentions)) {
+    return res.status(400).json(response.error("Intentions must be an array"));
+  }
+  const invalidIntentions = intentions.filter((i) => !ALLOWED_INTENTIONS.includes(i));
+  if (invalidIntentions.length > 0) {
+    return res.status(400).json(response.error(
+      `Invalid intentions: ${invalidIntentions.join(", ")}. Allowed: ${ALLOWED_INTENTIONS.join(", ")}`
+    ));
+  }
+
+  const updated = await userModel.updatePersonalization(req.user.id, {
+    avatar_id: avatarId,
+    intentions: intentions,
+  });
+
+  res.status(200).json(response.success("Personalization saved successfully", {
+    avatarId: updated.avatar_id,
+    intentions: updated.intentions || [],
   }));
 });
 
@@ -105,6 +152,7 @@ const deleteAccount = asyncHandler(async (req, res) => {
 module.exports = {
   getProfile,
   updateProfile,
+  updatePersonalization,
   changePassword,
   deleteAccount,
 };

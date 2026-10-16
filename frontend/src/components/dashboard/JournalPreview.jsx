@@ -14,7 +14,7 @@ function JournalPreview({ journals = [] }) {
       
       {journals.length ? (
         <div className="dashboard-journals__list">
-          {journals.slice(0, 2).map((journal) => (
+          {journals.slice(0, 3).map((journal) => (
             <article className="dashboard-journal" key={journal.id}>
               <span className="dashboard-journal__emoji" aria-hidden="true">{journal.mood}</span>
               <div>

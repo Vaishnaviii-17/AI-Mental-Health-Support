@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <circle cx="40" cy="40" r="40" fill="#fffde7"/>
+  <!-- 5-point star -->
+  <polygon
+    points="40,14 46.8,34 68,34 51.6,46.8 58,66 40,54 22,66 28.4,46.8 12,34 33.2,34"
+    fill="#fdd835"
+    stroke="#f9a825"
+    stroke-width="1.5"
+    stroke-linejoin="round"
+  />
+  <!-- Inner highlight -->
+  <polygon
+    points="40,22 44.2,35 58,35 47.2,43 51,56 40,48 29,56 32.8,43 22,35 35.8,35"
+    fill="#ffee58"
+    opacity="0.6"
+  />
+</svg>

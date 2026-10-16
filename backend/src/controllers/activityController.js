@@ -90,7 +90,7 @@ const getStats = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { activityType } = req.params;
 
-  if (!["pop_stress", "memory_match", "breathing_bubble"].includes(activityType)) {
+  if (!["pop_stress", "memory_match", "breathing_bubble", "guided_meditation", "calming_music"].includes(activityType)) {
     return res.status(400).json(response.error("Invalid activity type."));
   }
 
@@ -108,13 +108,13 @@ const getBest = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const { activityType } = req.params;
 
-  if (!["pop_stress", "memory_match", "breathing_bubble"].includes(activityType)) {
+  if (!["pop_stress", "memory_match", "breathing_bubble", "guided_meditation", "calming_music"].includes(activityType)) {
     return res.status(400).json(response.error("Invalid activity type."));
   }
 
   const stats = await activityModel.getBestStats(userId, activityType);
-  const bestScore = activityType === "breathing_bubble" 
-    ? stats.bestCompletion 
+  const bestScore = (activityType === "breathing_bubble" || activityType === "guided_meditation" || activityType === "calming_music")
+    ? stats.bestCompletion
     : stats.bestScore;
 
   return res.status(200).json(
@@ -154,7 +154,8 @@ const getOverallStats = asyncHandler(async (req, res) => {
   const ACTIVITY_CATEGORY_MAP = {
     breathing_bubble: "relaxation",
     pop_stress: "stress_relief",
-    memory_match: "focus"
+    memory_match: "focus",
+    guided_meditation: "relaxation"
   };
 
   const categoryTime = {
@@ -205,7 +206,8 @@ const getWellnessTime = asyncHandler(async (req, res) => {
   const ACTIVITY_CATEGORY_MAP = {
     breathing_bubble: "relaxation",
     pop_stress: "stress_relief",
-    memory_match: "focus"
+    memory_match: "focus",
+    guided_meditation: "relaxation"
   };
 
   const categoryTime = {

@@ -188,7 +188,8 @@ http://localhost:5000
 ## Start Python AI Service
 
 The Python service runs the existing GoEmotions journal analysis at
-`POST /predict` and the Whisper transcription endpoint at `POST /transcribe`.
+`POST /predict`, the Whisper transcription endpoint at `POST /transcribe`,
+and voice-journal multimodal analysis at `POST /voice-journal/analyze`.
 
 ```bash
 cd backend/python
@@ -236,25 +237,32 @@ Supported journal languages are English (`en`), Hindi (`hi`), and Marathi
 spoke or typed.
 
 ```text
-Voice
-  |
-  v
-Whisper
-  |
-  v
-Original Language Text
+Original audio
+  |-----------------------------|
+  v                             v
+Whisper                    Wav2Vec2 speech emotion
+  |                             |
+  v                             v
+Editable transcript        Voice emotion probabilities
   |
   v
 Translation (hi/mr only)
   |
   v
-English Analysis Text
+English analysis text
+  |
+  |-----------------------------|
+  v                             v
+GoEmotions text emotion    Risk screening
   |
   v
-GoEmotions
+Common seven-emotion mapping
   |
   v
-Database
+Jensen-Shannon mismatch + confidence-weighted fusion
+  |
+  v
+Final mood signal
 ```
 
 For English journals, the original text is analyzed directly. For Hindi and
@@ -262,11 +270,79 @@ Marathi journals, the backend translates the text to English first, sends only
 that English analysis text to GoEmotions/risk analysis, and stores the original
 language text in `journals.content`.
 
+Typed/manual journal entries still use `POST /api/journal` and remain text-only.
+Voice-created entries use `POST /api/journal/voice`, which sends the edited
+transcript plus the original in-memory audio recording. The audio is not stored
+in PostgreSQL.
+
+Speech emotion uses the Hugging Face model:
+
+```text
+Dpngtm/wav2vec2-emotion-recognition
+```
+
+The model labels are `Angry`, `Disgust`, `Fear`, `Happy`, `Neutral`, `Sad`,
+and `Surprise`. Audio is decoded with PyAV, converted to mono 16 kHz, split into
+8-second chunks, analyzed chunk-by-chunk, and aggregated with mean probability
+across valid chunks. The model is loaded lazily and kept in memory by the Python
+service. On machines where the model is already cached, the loader uses the
+local Hugging Face cache first; if it is not cached, the first run downloads it
+from Hugging Face.
+
+Required Python packages are listed in `backend/python/requirements.txt`,
+including `torch`, `transformers`, `huggingface-hub`, `faster-whisper`, and
+`av` for audio decoding.
+
+Text and speech outputs are mapped into this common emotion space:
+
+```text
+joy, sadness, anger, fear, surprise, neutral, other
+```
+
+GoEmotions labels are explicitly grouped into those seven categories. Speech
+labels map as: `Happy -> joy`, `Sad -> sadness`, `Angry -> anger`,
+`Fear -> fear`, `Surprise -> surprise`, `Neutral -> neutral`, and
+`Disgust -> other`. If multiple labels map to one common category, their
+probabilities are summed and normalized.
+
+For voice journals, the system compares complete text and voice distributions
+with Jensen-Shannon distance. Initial engineering thresholds are:
+
+```text
+score < 0.20       low mismatch
+0.20 <= score < 0.40  moderate mismatch
+score >= 0.40      high mismatch
+```
+
+Low/moderate mismatch uses confidence-weighted late fusion, where each branch's
+confidence is the maximum probability in its common distribution. High mismatch
+returns the final mood as `mixed` / "Mixed emotional signals" instead of
+averaging contradictory signals into neutral.
+
+Risk screening remains independent. It is computed from the transcript/text
+branch by the existing Python risk detector and is never averaged with voice
+emotion. A positive or happy tone cannot lower a high textual risk result.
+
+Speech emotion is an acoustic emotion signal for this student project, not a
+clinical diagnostic model. The selected speech-emotion model is primarily
+intended for English; Hindi and Marathi voice journals keep the existing
+Whisper/translation behavior, but speech-tone predictions should not be treated
+as equally validated across languages.
+
 The journal table stores:
 
 - `content`: original user text
 - `original_language`: `en`, `hi`, or `mr`
 - `translated_content`: English translation for Hindi/Marathi entries
+- `multimodal_analysis`: optional voice-journal details including text emotion,
+  voice emotion, mismatch, fusion, and language/model notes
+
+Run migrations after pulling this feature:
+
+```bash
+cd backend
+npm run migrate
+```
 
 Whisper settings are centralized in environment variables:
 
@@ -277,6 +353,7 @@ WHISPER_DEVICE=auto
 WHISPER_COMPUTE_TYPE=int8
 TRANSCRIPTION_MAX_AUDIO_BYTES=10485760
 TRANSCRIPTION_TIMEOUT_MS=60000
+VOICE_JOURNAL_INFERENCE_TIMEOUT_MS=120000
 ```
 
 The default model is `tiny.en`, chosen for local development speed and lower
@@ -302,9 +379,11 @@ English-only analysis model is not run on untranslated text.
 
 Audio privacy handling:
 
-- Browser audio is uploaded only for transcription.
+- Browser audio is uploaded for transcription and, for voice-created journals,
+  speech-emotion analysis.
 - Node keeps the upload in memory and does not write an audio file.
-- The Python service writes a temporary file only for Whisper processing.
+- The Python service writes a temporary file only for Whisper and Wav2Vec2
+  processing.
 - Temporary audio is deleted in a cleanup block after success or failure.
 - Audio files, audio URLs, and raw recordings are not stored in PostgreSQL.
 

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <circle cx="40" cy="40" r="40" fill="#e3eff7"/>
+  <!-- Mountain layers -->
+  <polygon points="40,16 64,60 16,60" fill="#5c8fa8"/>
+  <polygon points="28,36 52,60 4,60" fill="#3b6e8a"/>
+  <polygon points="54,28 72,60 36,60" fill="#7aaec4"/>
+  <!-- Snow caps -->
+  <polygon points="40,16 47,30 33,30" fill="#f0f9ff"/>
+  <polygon points="54,28 59,38 49,38" fill="#f0f9ff"/>
+</svg>

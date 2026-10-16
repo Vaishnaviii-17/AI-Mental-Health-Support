@@ -11,6 +11,7 @@ router.use(authMiddleware);
 router.get("/", journalController.getJournals);
 router.get("/recent", journalController.getRecentJournals);
 router.post("/transcribe", uploadAudio, transcriptionController.transcribeAudio);
+router.post("/voice", uploadAudio, journalController.createVoiceJournal);
 router.get("/:id", journalController.getJournalById);
 router.post("/", journalController.createJournal);
 router.delete("/:id", journalController.deleteJournal);

@@ -24,14 +24,16 @@ import {
 } from "lucide-react";
 
 import Navbar from "../components/Navbar/Navbar";
-import {
-  getJournals,
-  createJournal,
-  deleteJournal,
-  transcribeJournalAudio,
-} from "../services/journalService";
+import * as journalService from "../services/journalService";
 import "./Journal.css";
 import IndicVirtualKeyboard from "./IndicVirtualKeyboard";
+
+/* The service is imported as a namespace so that a stale local
+   journalService.js (one that lacks an export) cannot crash the module at
+   load time. Every function is checked before use; nothing is invented. */
+const { getJournals, createJournal, deleteJournal, transcribeJournalAudio } =
+  journalService;
+const createVoiceJournal = journalService.createVoiceJournal;
 
 function getStoredUser() {
   try {
@@ -54,9 +56,16 @@ function formatEmotionPercent(probability) {
 }
 
 function displayEmotionLabel(emotion) {
+  if (emotion === "mixed") return "Mixed emotional signals";
   if (!emotion || emotion === "neutral") return "Neutral";
 
   return emotion.charAt(0).toUpperCase() + emotion.slice(1);
+}
+
+function displayMismatchLabel(category) {
+  if (!category) return "Unavailable";
+
+  return category.charAt(0).toUpperCase() + category.slice(1);
 }
 
 function formatRiskPercent(score) {
@@ -340,6 +349,78 @@ function RiskScreening({ analysis }) {
   );
 }
 
+function VoiceSignals({ journal }) {
+  const multimodal =
+    journal?.multimodal_analysis &&
+    typeof journal.multimodal_analysis === "object"
+      ? journal.multimodal_analysis
+      : null;
+
+  if (!multimodal) return null;
+
+  const fusion = multimodal.fusion || null;
+  const mismatch = multimodal.mismatch || null;
+  const voiceEmotion = multimodal.voiceEmotion || null;
+  const textEmotion = multimodal.textEmotion || null;
+  const originalLanguage = journal?.original_language || "en";
+  const languageMeta =
+    JOURNAL_LANGUAGES[originalLanguage] || JOURNAL_LANGUAGES.en;
+
+  return (
+    <section
+      className="journal-voice-analysis-panel"
+      aria-label="Voice mood signals"
+    >
+      <div className="journal-analysis-header">
+        <Mic size={14} aria-hidden="true" />
+        <h4>Voice Mood Signals</h4>
+      </div>
+
+      <div className="journal-analysis-grid journal-voice-analysis-grid">
+        <div className="analysis-item">
+          <span>Overall mood</span>
+          <strong>
+            {displayEmotionLabel(fusion?.finalMood || journal.emotion)}
+          </strong>
+        </div>
+
+        <div className="analysis-item">
+          <span>Text emotion</span>
+          <strong>{displayEmotionLabel(textEmotion?.dominant)}</strong>
+        </div>
+
+        <div className="analysis-item">
+          <span>Voice tone</span>
+          <strong>
+            {voiceEmotion
+              ? displayEmotionLabel(voiceEmotion.commonEmotion)
+              : "Unavailable"}
+          </strong>
+        </div>
+
+        <div className="analysis-item">
+          <span>Emotional mismatch</span>
+          <strong>{displayMismatchLabel(mismatch?.category)}</strong>
+        </div>
+      </div>
+
+      {multimodal.voiceEmotionError && (
+        <p className="journal-analysis-secondary-empty">
+          Speech emotion analysis was unavailable, so this entry used the
+          text mood signal.
+        </p>
+      )}
+
+      {multimodal.speechEmotionLanguageNote && originalLanguage !== "en" && (
+        <p className="journal-risk-disclaimer">
+          Voice tone analysis uses the original acoustic signal and may be
+          less reliable for {languageMeta.label}.
+        </p>
+      )}
+    </section>
+  );
+}
+
 function ReflectionPanel({ journal, heading }) {
   const analysis = getAnalysisView(journal);
 
@@ -475,6 +556,8 @@ function ReflectionPanel({ journal, heading }) {
         </p>
       )}
 
+      <VoiceSignals journal={journal} />
+
       <RiskScreening analysis={analysis} />
     </motion.div>
   );
@@ -546,6 +629,8 @@ function JournalPage() {
 
   const [voiceStatus, setVoiceStatus] = useState("idle");
   const [voiceError, setVoiceError] = useState("");
+  const [voiceAudioBlob, setVoiceAudioBlob] = useState(null);
+  const [notice, setNotice] = useState(null);
   const [entryLanguage, setEntryLanguage] = useState("en");
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const contentRef = useRef(null);
@@ -681,14 +766,33 @@ function JournalPage() {
 
     setSubmitting(true);
     setError(null);
+    setNotice(null);
     setSuccess(false);
 
     try {
-      const created = await createJournal({
+      const payload = {
         title: form.title.trim(),
         content: form.content.trim(),
         originalLanguage: entryLanguage,
-      });
+      };
+
+      let created;
+
+      if (voiceAudioBlob && typeof createVoiceJournal === "function") {
+        created = await createVoiceJournal({
+          ...payload,
+          audioBlob: voiceAudioBlob,
+        });
+      } else {
+        if (voiceAudioBlob) {
+          /* Never drop the audio silently: tell the user plainly. */
+          setNotice(
+            "Voice tone analysis is unavailable because createVoiceJournal is missing from journalService. This entry was saved with text analysis only."
+          );
+        }
+
+        created = await createJournal(payload);
+      }
 
       const newEntry = created?.journal || created;
 
@@ -697,6 +801,9 @@ function JournalPage() {
       setShowTranslatedJournal(false);
       setForm({ title: "", content: "" });
       setEntryLanguage("en");
+      setKeyboardOpen(false);
+      setVoiceAudioBlob(null);
+      setVoiceError("");
       setSuccess(true);
 
       window.setTimeout(() => setSuccess(false), 3000);
@@ -759,6 +866,7 @@ function JournalPage() {
         ...prev,
         content: appendTranscript(prev.content, text),
       }));
+      setVoiceAudioBlob(audioBlob);
 
       setVoiceStatus("success");
 
@@ -912,8 +1020,8 @@ function JournalPage() {
 
       result = result.filter(
         (journal) =>
-          journal.title.toLowerCase().includes(term) ||
-          journal.content.toLowerCase().includes(term)
+          (journal.title || "").toLowerCase().includes(term) ||
+          (journal.content || "").toLowerCase().includes(term)
       );
     }
 
@@ -1031,6 +1139,7 @@ function JournalPage() {
 
   const startNewEntry = () => {
     setSavedReflection(null);
+    setVoiceAudioBlob(null);
     setShowTranslatedJournal(false);
   };
 
@@ -1515,7 +1624,10 @@ function JournalPage() {
                       onClick={() => {
                         setForm({ title: "", content: "" });
                         setEntryLanguage("en");
+                        setKeyboardOpen(false);
                         setVoiceError("");
+                        setVoiceAudioBlob(null);
+                        setNotice(null);
                       }}
                       disabled={submitting || isVoiceBusy}
                     >
@@ -1861,6 +1973,16 @@ function JournalPage() {
             <div className="journal-alert journal-alert--error" role="alert">
               <AlertCircle size={15} />
               <span>{error}</span>
+            </div>
+          )}
+
+          {notice && (
+            <div
+              className="journal-alert journal-alert--warning"
+              role="alert"
+            >
+              <AlertCircle size={15} />
+              <span>{notice}</span>
             </div>
           )}
 

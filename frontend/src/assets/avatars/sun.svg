@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <circle cx="40" cy="40" r="40" fill="#fff8e1"/>
+  <!-- Sun rays -->
+  <line x1="40" y1="10" x2="40" y2="18" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+  <line x1="40" y1="62" x2="40" y2="70" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+  <line x1="10" y1="40" x2="18" y2="40" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+  <line x1="62" y1="40" x2="70" y2="40" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+  <line x1="18" y1="18" x2="24" y2="24" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+  <line x1="56" y1="56" x2="62" y2="62" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+  <line x1="62" y1="18" x2="56" y2="24" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+  <line x1="18" y1="62" x2="24" y2="56" stroke="#f5a623" stroke-width="3" stroke-linecap="round"/>
+  <!-- Sun body -->
+  <circle cx="40" cy="40" r="13" fill="#fdd835"/>
+  <circle cx="40" cy="40" r="9" fill="#ffb300"/>
+</svg>

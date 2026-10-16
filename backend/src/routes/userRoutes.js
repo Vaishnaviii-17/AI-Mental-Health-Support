@@ -9,6 +9,7 @@ router.use(authMiddleware);
 
 router.get("/profile", userController.getProfile);
 router.put("/profile", userController.updateProfile);
+router.put("/personalization", userController.updatePersonalization);
 router.put("/password", userController.changePassword);
 router.delete("/account", userController.deleteAccount);
 

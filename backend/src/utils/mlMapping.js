@@ -57,6 +57,7 @@ const EMOTION_EMOJI_MAP = {
   sadness: "😢",
   surprise: "😲",
   neutral: "😐",
+  mixed: "🌀",
 };
 
 const DEFAULT_EMOTION_EMOJI = "🙂";

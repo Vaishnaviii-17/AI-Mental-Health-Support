@@ -3,12 +3,27 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User, KeyRound, AlertTriangle, LogOut, Loader2, Save,
-  Trash2, X, CheckCircle, Eye, EyeOff, ShieldCheck
+  Trash2, X, CheckCircle, Eye, EyeOff, ShieldCheck, Sparkles, Pencil
 } from "lucide-react";
 import Navbar from "../components/Navbar/Navbar";
-import { getProfile, updateProfile, changePassword, deleteAccount } from "../services/profileService";
+import AvatarPicker, { AVATAR_LIST, getAvatarSrc } from "../components/profile/AvatarPicker";
+import {
+  getProfile, updateProfile, updatePersonalization,
+  changePassword, deleteAccount
+} from "../services/profileService";
 import "./Profile.css";
 
+// ─── Wellness intentions ──────────────────────────────────────────────────────
+const INTENTIONS = [
+  { id: "relaxation",      label: "Relaxation" },
+  { id: "focus_clarity",   label: "Focus & Clarity" },
+  { id: "mindfulness",     label: "Mindfulness" },
+  { id: "mood_awareness",  label: "Mood Awareness" },
+  { id: "self_compassion", label: "Self-Compassion" },
+  { id: "better_habits",   label: "Better Daily Habits" },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function getPasswordStrength(pwd) {
   if (!pwd) return { level: 0, label: "" };
   let score = 0;
@@ -23,6 +38,7 @@ function getPasswordStrength(pwd) {
   return { level: 4, label: "Strong" };
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 function ProfilePage() {
   const navigate = useNavigate();
 
@@ -31,6 +47,12 @@ function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [updatingProfile, setUpdatingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: "", email: "" });
+
+  // Personalization state
+  const [avatarId, setAvatarId] = useState("lotus");
+  const [intentions, setIntentions] = useState([]);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [savingPersonalization, setSavingPersonalization] = useState(false);
 
   // Password state
   const [changingPassword, setChangingPassword] = useState(false);
@@ -70,10 +92,13 @@ function ProfilePage() {
         name: data.fullName || data.username || "",
         email: data.email || ""
       });
+      setAvatarId(data.avatarId || "lotus");
+      setIntentions(data.intentions || []);
       // Sync localStorage
       const localUser = JSON.parse(localStorage.getItem("user") || "{}");
-      if (localUser.username !== data.username) {
+      if (localUser.username !== data.username || localUser.avatarId !== data.avatarId) {
         localUser.username = data.username;
+        localUser.avatarId = data.avatarId || "lotus";
         localStorage.setItem("user", JSON.stringify(localUser));
       }
     } catch (err) {
@@ -88,10 +113,10 @@ function ProfilePage() {
     loadProfile();
   }, [loadProfile]);
 
+  // ── Profile form handlers ──
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
     setProfileForm((prev) => ({ ...prev, [name]: value }));
-    // Clear specific field error on typing
     if (fieldErrors[name]) {
       setFieldErrors((prev) => ({ ...prev, [name]: "" }));
     }
@@ -143,7 +168,7 @@ function ProfilePage() {
         name: profileForm.name.trim(),
         email: profileForm.email.trim()
       });
-      setProfile(updated);
+      setProfile((prev) => ({ ...prev, ...updated }));
       showMsg("success", "Profile details updated successfully.", "details");
     } catch (err) {
       console.error("Error updating profile", err);
@@ -153,6 +178,51 @@ function ProfilePage() {
     }
   };
 
+  // ── Personalization handlers ──
+  const handleAvatarSave = async (newId) => {
+    setShowAvatarPicker(false);
+    if (newId === avatarId) return; // no change
+    setSavingPersonalization(true);
+    clearMessage();
+    try {
+      const result = await updatePersonalization({ avatarId: newId, intentions });
+      setAvatarId(result.avatarId);
+      setProfile((prev) => ({ ...prev, avatarId: result.avatarId }));
+      // Sync localStorage so Navbar reflects new avatar immediately
+      const localUser = JSON.parse(localStorage.getItem("user") || "{}");
+      localUser.avatarId = result.avatarId;
+      localStorage.setItem("user", JSON.stringify(localUser));
+      showMsg("success", "Avatar updated!", "personalization");
+    } catch (err) {
+      console.error("Error saving avatar", err);
+      showMsg("error", err.response?.data?.message || "Failed to save avatar.", "personalization");
+    } finally {
+      setSavingPersonalization(false);
+    }
+  };
+
+  const toggleIntention = (id) => {
+    setIntentions((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSaveIntentions = async () => {
+    setSavingPersonalization(true);
+    clearMessage();
+    try {
+      const result = await updatePersonalization({ avatarId, intentions });
+      setIntentions(result.intentions || []);
+      showMsg("success", "Wellness intentions saved.", "personalization");
+    } catch (err) {
+      console.error("Error saving intentions", err);
+      showMsg("error", err.response?.data?.message || "Failed to save intentions.", "personalization");
+    } finally {
+      setSavingPersonalization(false);
+    }
+  };
+
+  // ── Password & account handlers ──
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (!validatePasswordForm()) return;
@@ -213,10 +283,11 @@ function ProfilePage() {
     || "M";
 
   const pwStrength = getPasswordStrength(passwordForm.newPassword);
-
   const toggleShowPassword = (field) => {
     setShowPasswords((prev) => ({ ...prev, [field]: !prev[field] }));
   };
+
+  const currentAvatarSrc = getAvatarSrc(avatarId);
 
   return (
     <>
@@ -227,7 +298,7 @@ function ProfilePage() {
           <header className="profile-header">
             <span className="eyebrow">Your space</span>
             <h1>Profile</h1>
-            <p className="profile-subtitle">Manage your personal settings, password and account.</p>
+            <p className="profile-subtitle">Manage your avatar, wellness intentions, personal settings, and account.</p>
           </header>
 
           {/* Global Feedback Message */}
@@ -245,13 +316,30 @@ function ProfilePage() {
             </div>
           ) : (
             <div className="profile-grid">
-              {/* Left Column: Avatar Card & Logout */}
+              {/* ── Left Column: Avatar Card & Logout ── */}
               <section className="profile-sidebar-column">
                 <div className="dashboard-card profile-avatar-card">
-                  <div className="profile-big-avatar">{userInitial}</div>
+                  {/* Avatar display */}
+                  <div className="profile-big-avatar">
+                    {avatarId ? (
+                      <img src={currentAvatarSrc} alt={`${avatarId} avatar`} className="profile-avatar-img" />
+                    ) : (
+                      userInitial
+                    )}
+                  </div>
                   <h2>{profile?.fullName || profile?.username}</h2>
                   <p className="profile-email-display">{profile?.email}</p>
                   <p className="profile-member-date">Member since {formatDate(profile?.memberSince)}</p>
+
+                  <button
+                    type="button"
+                    className="btn btn-ghost profile-change-avatar-btn"
+                    onClick={() => setShowAvatarPicker(true)}
+                    disabled={savingPersonalization}
+                  >
+                    <Pencil size={14} />
+                    Change Avatar
+                  </button>
 
                   <button type="button" className="btn btn-ghost profile-logout-btn" onClick={handleLogout}>
                     <LogOut size={16} />
@@ -260,9 +348,72 @@ function ProfilePage() {
                 </div>
               </section>
 
-              {/* Right Column: Edit Forms & Danger Zone */}
+              {/* ── Right Column: Edit Forms & Danger Zone ── */}
               <section className="profile-content-column">
-                {/* Personal Details Form */}
+
+                {/* ── Personalization Card ── */}
+                <div className="dashboard-card">
+                  <div className="dashboard-card__heading">
+                    <div>
+                      <span className="eyebrow">Personalization</span>
+                      <h2>Wellness intentions</h2>
+                    </div>
+                    <Sparkles size={20} className="profile-card-icon" />
+                  </div>
+
+                  {message.text && message.section === "personalization" && (
+                    <div className={`profile-section-alert profile-alert--${message.type}`} role="alert">
+                      {message.type === "success" ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+                      <span>{message.text}</span>
+                    </div>
+                  )}
+
+                  <p className="intentions-hint">
+                    What are you focusing on right now? Select any that feel right — you can update these any time.
+                  </p>
+
+                  <div className="intentions-grid">
+                    {INTENTIONS.map((intent) => (
+                      <button
+                        key={intent.id}
+                        type="button"
+                        className={`intention-chip ${intentions.includes(intent.id) ? "intention-chip--selected" : ""}`}
+                        onClick={() => toggleIntention(intent.id)}
+                        aria-pressed={intentions.includes(intent.id)}
+                      >
+                        {intent.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="intentions-actions">
+                    <button
+                      type="button"
+                      className="btn btn-primary profile-submit-btn"
+                      onClick={handleSaveIntentions}
+                      disabled={savingPersonalization}
+                    >
+                      {savingPersonalization ? (
+                        <Loader2 size={16} className="btn-spinner" />
+                      ) : (
+                        <Save size={16} />
+                      )}
+                      {savingPersonalization ? "Saving..." : "Save Intentions"}
+                    </button>
+                    {intentions.length > 0 && (
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => setIntentions([])}
+                        disabled={savingPersonalization}
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── Personal Details Form ── */}
                 <div className="dashboard-card">
                   <div className="dashboard-card__heading">
                     <div>
@@ -272,7 +423,6 @@ function ProfilePage() {
                     <User size={20} className="profile-card-icon" />
                   </div>
 
-                  {/* Section-level message */}
                   {message.text && message.section === "details" && (
                     <div className={`profile-section-alert profile-alert--${message.type}`} role="alert">
                       {message.type === "success" ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
@@ -328,7 +478,7 @@ function ProfilePage() {
                   </form>
                 </div>
 
-                {/* Change Password Form */}
+                {/* ── Change Password Form ── */}
                 <div className="dashboard-card">
                   <div className="dashboard-card__heading">
                     <div>
@@ -355,6 +505,7 @@ function ProfilePage() {
                           id="currentPassword"
                           name="currentPassword"
                           placeholder="Enter current password"
+                          autoComplete="current-password"
                           value={passwordForm.currentPassword}
                           onChange={handlePasswordChange}
                         />
@@ -381,6 +532,7 @@ function ProfilePage() {
                           id="newPassword"
                           name="newPassword"
                           placeholder="At least 8 characters"
+                          autoComplete="new-password"
                           value={passwordForm.newPassword}
                           onChange={handlePasswordChange}
                         />
@@ -418,6 +570,7 @@ function ProfilePage() {
                           id="confirmPassword"
                           name="confirmPassword"
                           placeholder="Re-enter new password"
+                          autoComplete="new-password"
                           value={passwordForm.confirmPassword}
                           onChange={handlePasswordChange}
                         />
@@ -450,7 +603,7 @@ function ProfilePage() {
                   </form>
                 </div>
 
-                {/* Danger Zone */}
+                {/* ── Danger Zone ── */}
                 <div className="dashboard-card profile-danger-card">
                   <div className="dashboard-card__heading">
                     <div>
@@ -476,6 +629,15 @@ function ProfilePage() {
           )}
         </div>
       </main>
+
+      {/* Avatar Picker Modal */}
+      {showAvatarPicker && (
+        <AvatarPicker
+          currentAvatarId={avatarId}
+          onSave={handleAvatarSave}
+          onClose={() => setShowAvatarPicker(false)}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>

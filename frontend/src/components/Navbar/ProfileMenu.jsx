@@ -9,6 +9,7 @@ import {
   User,
   UserRound,
 } from "lucide-react";
+import { getAvatarSrc } from "../profile/AvatarPicker";
 import "./ProfileMenu.css";
 
 function ProfileMenu({ profile }) {
@@ -20,6 +21,7 @@ function ProfileMenu({ profile }) {
 
   const avatarInitial =
     profile?.username?.charAt(0)?.toUpperCase() || "M";
+  const avatarSrc = profile?.avatarId ? getAvatarSrc(profile.avatarId) : null;
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -59,7 +61,9 @@ function ProfileMenu({ profile }) {
         aria-haspopup="menu"
       >
         <span className="profile-menu__avatar">
-          {profile?.username ? (
+          {avatarSrc ? (
+            <img src={avatarSrc} alt="avatar" className="profile-menu__avatar-img" />
+          ) : profile?.username ? (
             avatarInitial
           ) : (
             <UserRound size={18} />
@@ -87,7 +91,11 @@ function ProfileMenu({ profile }) {
           >
             <div className="profile-menu__header">
               <div className="profile-menu__avatar profile-menu__avatar--large">
-                {avatarInitial}
+                {avatarSrc ? (
+                  <img src={avatarSrc} alt="avatar" className="profile-menu__avatar-img" />
+                ) : (
+                  avatarInitial
+                )}
               </div>
 
               <div>

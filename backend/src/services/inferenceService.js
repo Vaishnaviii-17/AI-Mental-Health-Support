@@ -30,6 +30,7 @@
  */
 
 const axios = require("axios");
+const FormData = require("form-data");
 
 
 /**
@@ -51,6 +52,10 @@ const ML_INFERENCE_URL =
 
 const INFERENCE_TIMEOUT_MS =
   Number(process.env.INFERENCE_TIMEOUT_MS) || 15000;
+
+
+const VOICE_JOURNAL_TIMEOUT_MS =
+  Number(process.env.VOICE_JOURNAL_INFERENCE_TIMEOUT_MS) || 120000;
 
 
 const CHAT_TIMEOUT_MS =
@@ -126,6 +131,84 @@ async function analyzeText(text) {
     throw new Error(
       "Mental health inference service unavailable"
     );
+  }
+}
+
+
+async function analyzeVoiceJournal(text, audioFile, language = "en") {
+
+  if (typeof text !== "string") {
+    throw new TypeError("text must be a string");
+  }
+
+  const cleanedText = text.trim();
+
+  if (!cleanedText) {
+    throw new Error("text cannot be empty");
+  }
+
+  if (!audioFile || !audioFile.buffer || audioFile.size <= 0) {
+    throw new Error("audio file is required");
+  }
+
+  const form = new FormData();
+  form.append("text", cleanedText);
+  form.append("language", language);
+  form.append("audio", audioFile.buffer, {
+    filename: audioFile.originalname || "journal-audio.webm",
+    contentType: audioFile.mimetype || "audio/webm",
+    knownLength: audioFile.size,
+  });
+
+  try {
+
+    const res = await axios.post(
+      `${ML_INFERENCE_URL}/voice-journal/analyze`,
+      form,
+      {
+        headers: form.getHeaders(),
+        maxBodyLength: Infinity,
+        timeout: VOICE_JOURNAL_TIMEOUT_MS,
+      }
+    );
+
+    return res.data;
+
+  } catch (error) {
+
+    if (error.response) {
+
+      console.error(
+        "Voice journal inference server error:",
+        error.response.status,
+        error.response.data
+      );
+
+      const err = new Error(
+        error.response.data?.error ||
+          "Voice journal inference failed"
+      );
+      err.statusCode = error.response.status;
+      throw err;
+    }
+
+    if (error.request) {
+      console.error(
+        "Voice journal inference server is unreachable:",
+        ML_INFERENCE_URL
+      );
+    } else {
+      console.error(
+        "Voice journal inference request error:",
+        error.message
+      );
+    }
+
+    const err = new Error(
+      "Voice journal analysis service unavailable"
+    );
+    err.statusCode = 503;
+    throw err;
   }
 }
 
@@ -254,6 +337,7 @@ async function healthCheck() {
 
 module.exports = {
   analyzeText,
+  analyzeVoiceJournal,
   generateChatResponse,
   healthCheck,
 };

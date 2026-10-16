@@ -758,6 +758,8 @@
 .text-sparkles { color: var(--forest-500); }
 .text-brain { color: var(--forest-600); }
 .text-wind { color: var(--forest-400); }
+.text-meditation { color: var(--gold-600); }
+.text-music { color: #3d8b68; }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {

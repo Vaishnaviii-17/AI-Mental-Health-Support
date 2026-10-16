@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <circle cx="40" cy="40" r="40" fill="#d4edda"/>
+  <!-- Lotus flower -->
+  <ellipse cx="40" cy="48" rx="8" ry="14" fill="#7ec8a0" transform="rotate(-30 40 48)"/>
+  <ellipse cx="40" cy="48" rx="8" ry="14" fill="#5aac82" transform="rotate(30 40 48)"/>
+  <ellipse cx="40" cy="46" rx="8" ry="14" fill="#3d8f65" transform="rotate(0 40 46)"/>
+  <ellipse cx="40" cy="48" rx="8" ry="14" fill="#7ec8a0" transform="rotate(-60 40 48)"/>
+  <ellipse cx="40" cy="48" rx="8" ry="14" fill="#7ec8a0" transform="rotate(60 40 48)"/>
+  <circle cx="40" cy="42" r="7" fill="#f9e4c8"/>
+  <circle cx="40" cy="42" r="4" fill="#f5c18e"/>
+</svg>

@@ -171,6 +171,145 @@ const createJournal = asyncHandler(async (req, res) => {
 });
 
 /**
+ * Create a new voice journal entry from an edited transcript and the
+ * original recording. This keeps the typed journal route unchanged
+ * while letting the voice route run speech/tone emotion analysis.
+ */
+const createVoiceJournal = asyncHandler(async (req, res) => {
+  const { title, content } = req.body;
+
+  if (!title || !title.trim()) {
+    return res.status(400).json(response.error("Title is required"));
+  }
+
+  if (!content || !content.trim()) {
+    return res.status(400).json(response.error("Journal content is required"));
+  }
+
+  if (!req.file) {
+    return res.status(400).json(response.error("Original voice recording is required."));
+  }
+
+  const trimmedContent = content.trim();
+  let originalLanguage;
+
+  try {
+    const requestedLanguage =
+      req.body?.originalLanguage || req.body?.original_language;
+    const detectedLanguage = detectLanguageFromText(trimmedContent);
+
+    originalLanguage = assertSupportedLanguage(
+      requestedLanguage && requestedLanguage !== "en"
+        ? requestedLanguage
+        : detectedLanguage
+    );
+  } catch (err) {
+    return res
+      .status(err.statusCode || 400)
+      .json(response.error(err.message));
+  }
+
+  let translationResult;
+
+  try {
+    translationResult = await translationService.translateToEnglish(
+      trimmedContent,
+      originalLanguage
+    );
+  } catch (err) {
+    console.error("Voice journal translation failed:", err.message);
+
+    return res
+      .status(err.statusCode || 503)
+      .json(
+        response.error(
+          err.message ||
+            "Unable to translate this journal entry for AI analysis."
+        )
+      );
+  }
+
+  let multimodalResult;
+
+  try {
+    multimodalResult = await inferenceService.analyzeVoiceJournal(
+      translationResult.text,
+      req.file,
+      originalLanguage
+    );
+  } catch (err) {
+    console.error("Voice journal ML analysis failed:", err.message);
+
+    return res
+      .status(err.statusCode || 503)
+      .json(
+        response.error(
+          "Voice journal analysis service is temporarily unavailable."
+        )
+      );
+  }
+
+  const analysis = multimodalResult?.analysis || {};
+  const resolvedEmotion = resolveEmotion(analysis);
+  const resolvedRisk = resolveRisk(analysis);
+  const fusion = multimodalResult?.fusion || null;
+
+  const finalEmotion =
+    fusion?.finalMood ||
+    resolvedEmotion.emotion ||
+    null;
+
+  const multimodalAnalysis = {
+    transcript: trimmedContent,
+    analysisText: translationResult.text,
+    textEmotion: multimodalResult?.textEmotion || null,
+    voiceEmotion: multimodalResult?.voiceEmotion || null,
+    voiceEmotionError: multimodalResult?.voiceEmotionError || null,
+    mismatch: multimodalResult?.mismatch || null,
+    fusion,
+    speechEmotionLanguageNote:
+      multimodalResult?.speechEmotionLanguageNote || null,
+    model:
+      multimodalResult?.voiceEmotion?.model ||
+      "Dpngtm/wav2vec2-emotion-recognition",
+  };
+
+  const riskAnalysis = analysis?.risk || null;
+
+  console.log("🎙️ Voice journal multimodal resolution:", {
+    finalMood: finalEmotion,
+    textEmotion: multimodalAnalysis.textEmotion?.dominant,
+    voiceEmotion: multimodalAnalysis.voiceEmotion?.commonEmotion,
+    mismatch: multimodalAnalysis.mismatch?.category,
+  });
+
+  console.log("🛟 Risk screening resolution:", {
+    riskLevel: resolvedRisk.riskLevel,
+    riskScore: resolvedRisk.riskScore,
+    detectedCategories: resolvedRisk.detectedCategories.map((c) => c.key),
+    protectiveSignals: resolvedRisk.protectiveSignals,
+  });
+
+  const journal = await journalModel.createVoiceJournal(req.user.id, {
+    title: title.trim(),
+    content: trimmedContent,
+    mood: emotionToEmoji(finalEmotion),
+    emotion: finalEmotion,
+    secondaryEmotions: resolvedEmotion.secondaryEmotions,
+    sentimentScore: sentimentToScore(analysis.sentiment?.scores),
+    riskAnalysis,
+    multimodalAnalysis,
+    insight: buildJournalSummary(analysis),
+    originalLanguage,
+    translatedContent: translationResult.translatedText,
+  });
+
+  res
+    .status(201)
+    .json(response.success("Voice journal entry saved successfully", journal));
+});
+
+/**
  * Delete a journal entry by ID
  */
 const deleteJournal = asyncHandler(async (req, res) => {
@@ -225,6 +364,7 @@ module.exports = {
   getJournals,
   getJournalById,
   createJournal,
+  createVoiceJournal,
   deleteJournal,
   getRecentJournals,
 };

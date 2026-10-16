@@ -15,6 +15,10 @@ const pool = require("../config/db");
  *                                is a heuristic screening indicator,
  *                                not a clinical assessment.
  *
+ *   multimodal_analysis JSONB -- optional voice-journal-only object
+ *                                containing text emotion, voice emotion,
+ *                                mismatch, and fusion details.
+ *
  * If the `journals` table does not yet have these columns, run:
  *
  *   ALTER TABLE journals
@@ -68,6 +72,54 @@ async function createJournal(
     originalLanguage || "en",
     translatedContent || null,
   ];
+  const { rows } = await pool.query(query, values);
+  return rows[0];
+}
+
+/**
+ * Create a new voice journal entry with optional multimodal analysis.
+ */
+async function createVoiceJournal(
+  userId,
+  {
+    title,
+    content,
+    mood,
+    emotion,
+    secondaryEmotions,
+    sentimentScore,
+    riskAnalysis,
+    multimodalAnalysis,
+    insight,
+    originalLanguage,
+    translatedContent,
+  }
+) {
+  const query = `
+    INSERT INTO journals (
+      user_id, title, content, mood, emotion,
+      secondary_emotions, sentiment_score, risk_analysis, insight,
+      original_language, translated_content, multimodal_analysis
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    RETURNING *;
+  `;
+
+  const values = [
+    userId,
+    title,
+    content,
+    mood,
+    emotion,
+    JSON.stringify(secondaryEmotions || []),
+    sentimentScore,
+    JSON.stringify(riskAnalysis || {}),
+    insight,
+    originalLanguage || "en",
+    translatedContent || null,
+    JSON.stringify(multimodalAnalysis || {}),
+  ];
+
   const { rows } = await pool.query(query, values);
   return rows[0];
 }
@@ -135,6 +187,7 @@ async function deleteJournal(id, userId) {
 
 module.exports = {
   createJournal,
+  createVoiceJournal,
   getJournals,
   getJournalById,
   getTodayJournals,

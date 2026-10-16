@@ -33,13 +33,12 @@ async function findByUsername(username) {
 }
 
 /**
- * Find user by ID
- * Anonymous-user system:
- * We only retrieve fields that exist in the users table.
+ * Find user by ID — returns all profile fields including email, full_name,
+ * avatar_id, and intentions added by later migrations.
  */
 async function findById(id) {
   const query = `
-    SELECT id, username, created_at
+    SELECT id, username, email, full_name, avatar_id, intentions, created_at
     FROM users
     WHERE id = $1;
   `;
@@ -67,20 +66,40 @@ async function updatePassword(id, hashedPassword) {
 }
 
 /**
- * Update user profile
- * Anonymous-user system:
- * Only username is editable.
+ * Update user profile — saves username, email, and full_name.
+ * The controller validates these fields before calling this function.
  */
-async function updateProfile(id, { username }) {
+async function updateProfile(id, { username, email, full_name }) {
   const query = `
     UPDATE users
-    SET username = $1,
+    SET username   = $1,
+        email      = $2,
+        full_name  = $3,
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = $2
-    RETURNING id, username, created_at, updated_at;
+    WHERE id = $4
+    RETURNING id, username, email, full_name, created_at, updated_at;
   `;
 
-  const { rows } = await pool.query(query, [username, id]);
+  const { rows } = await pool.query(query, [username, email, full_name, id]);
+
+  return rows[0] || null;
+}
+
+/**
+ * Update personalization preferences (avatar_id and intentions).
+ * Both values are pre-validated against allowlists in the controller.
+ */
+async function updatePersonalization(id, { avatar_id, intentions }) {
+  const query = `
+    UPDATE users
+    SET avatar_id  = $1,
+        intentions = $2,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = $3
+    RETURNING id, avatar_id, intentions;
+  `;
+
+  const { rows } = await pool.query(query, [avatar_id, intentions, id]);
 
   return rows[0] || null;
 }
@@ -103,5 +122,6 @@ module.exports = {
   findById,
   updatePassword,
   updateProfile,
+  updatePersonalization,
   deleteUser,
 };

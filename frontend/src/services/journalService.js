@@ -21,6 +21,28 @@ export const createJournal = async (journalData) => {
   return response.data?.data ?? response.data;
 };
 
+export const createVoiceJournal = async ({
+  title,
+  content,
+  originalLanguage = "en",
+  audioBlob,
+}) => {
+  const formData = new FormData();
+  formData.append("title", title);
+  formData.append("content", content);
+  formData.append("originalLanguage", originalLanguage);
+  formData.append("audio", audioBlob, "journal-audio.webm");
+
+  const response = await api.post("/journal/voice", formData, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+      "Content-Type": "multipart/form-data",
+    },
+  });
+
+  return response.data?.data ?? response.data;
+};
+
 export const transcribeJournalAudio = async (audioBlob, language = "en") => {
   const formData = new FormData();
   formData.append("audio", audioBlob, "journal-audio.webm");
