@@ -105,6 +105,25 @@
   font-size: var(--fs-3xl);
   box-shadow: var(--shadow-md);
   margin-bottom: var(--space-md);
+  overflow: hidden;
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--radius-full);
+}
+
+.profile-change-avatar-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.65rem;
+  font-size: var(--fs-xs);
+  margin-bottom: var(--space-xs);
 }
 
 .profile-avatar-card h2 {
@@ -457,4 +476,57 @@
 @keyframes profileFadeIn {
   from { opacity: 0; transform: translateY(-4px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* ==========================================
+   Wellness Intentions
+   ========================================== */
+.intentions-hint {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.intentions-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.intention-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1.5px solid var(--border-soft);
+  background: var(--white);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.18s, background-color 0.18s, color 0.18s, transform 0.15s;
+  user-select: none;
+}
+
+.intention-chip:hover {
+  border-color: var(--forest-500, #4caf82);
+  color: var(--forest-700, #276749);
+  transform: translateY(-1px);
+}
+
+.intention-chip--selected {
+  border-color: var(--forest-700, #276749);
+  background-color: rgba(39, 103, 73, 0.08);
+  color: var(--forest-700, #276749);
+  font-weight: 600;
+}
+
+.intentions-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
 }

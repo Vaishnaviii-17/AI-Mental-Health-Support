@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <circle cx="40" cy="40" r="40" fill="#dbeeff"/>
+  <!-- Waves -->
+  <path d="M10 38 Q20 28 30 38 Q40 48 50 38 Q60 28 70 38" stroke="#4a90c4" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <path d="M10 48 Q20 38 30 48 Q40 58 50 48 Q60 38 70 48" stroke="#2e6fa3" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <path d="M10 28 Q20 18 30 28 Q40 38 50 28 Q60 18 70 28" stroke="#7ab8de" stroke-width="3" fill="none" stroke-linecap="round"/>
+</svg>

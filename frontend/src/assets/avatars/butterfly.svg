@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <circle cx="40" cy="40" r="40" fill="#f3e5f5"/>
+  <!-- Butterfly wings -->
+  <!-- Top left wing -->
+  <ellipse cx="28" cy="32" rx="14" ry="10" fill="#ab6fc9" transform="rotate(-25 28 32)"/>
+  <ellipse cx="28" cy="32" rx="8" ry="6" fill="#ce93d8" transform="rotate(-25 28 32)"/>
+  <!-- Top right wing -->
+  <ellipse cx="52" cy="32" rx="14" ry="10" fill="#ab6fc9" transform="rotate(25 52 32)"/>
+  <ellipse cx="52" cy="32" rx="8" ry="6" fill="#ce93d8" transform="rotate(25 52 32)"/>
+  <!-- Bottom left wing -->
+  <ellipse cx="30" cy="50" rx="10" ry="8" fill="#9c4fbc" transform="rotate(20 30 50)"/>
+  <!-- Bottom right wing -->
+  <ellipse cx="50" cy="50" rx="10" ry="8" fill="#9c4fbc" transform="rotate(-20 50 50)"/>
+  <!-- Body -->
+  <ellipse cx="40" cy="40" rx="3" ry="12" fill="#4a148c"/>
+  <!-- Antennae -->
+  <path d="M38 28 Q32 18 28 15" stroke="#4a148c" stroke-width="1.5" fill="none"/>
+  <circle cx="28" cy="15" r="2.5" fill="#9c4fbc"/>
+  <path d="M42 28 Q48 18 52 15" stroke="#4a148c" stroke-width="1.5" fill="none"/>
+  <circle cx="52" cy="15" r="2.5" fill="#9c4fbc"/>
+</svg>

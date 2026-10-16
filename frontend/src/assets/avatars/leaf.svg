@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <circle cx="40" cy="40" r="40" fill="#e8f5e9"/>
+  <!-- Leaf shape -->
+  <path d="M40 18 C55 28 60 50 40 62 C20 50 25 28 40 18Z" fill="#4caf82"/>
+  <path d="M40 18 C55 28 60 50 40 62" fill="none" stroke="#276749" stroke-width="1.5"/>
+  <!-- Leaf vein -->
+  <line x1="40" y1="22" x2="40" y2="60" stroke="#276749" stroke-width="1.2"/>
+  <line x1="40" y1="34" x2="34" y2="44" stroke="#276749" stroke-width="0.8"/>
+  <line x1="40" y1="34" x2="46" y2="44" stroke="#276749" stroke-width="0.8"/>
+  <line x1="40" y1="42" x2="35" y2="50" stroke="#276749" stroke-width="0.8"/>
+  <line x1="40" y1="42" x2="45" y2="50" stroke="#276749" stroke-width="0.8"/>
+</svg>

@@ -2,11 +2,9 @@ import { useState } from "react";
 import "./FeedbackModal.css";
 
 const FEEDBACK_OPTIONS = [
-  { value: 1, label: "Much worse" },
-  { value: 2, label: "A little worse" },
-  { value: 3, label: "About the same" },
+  { value: 3, label: "Still the same" },
   { value: 4, label: "A little better" },
-  { value: 5, label: "Much better" },
+  { value: 5, label: "Good" },
 ];
 
 export default function FeedbackModal({ onSubmit, onSkip }) {
@@ -20,10 +18,10 @@ export default function FeedbackModal({ onSubmit, onSkip }) {
 
   return (
     <div className="feedback-modal-overlay">
-      <div className="feedback-modal">
+      <div className="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-title">
         <div className="feedback-modal__header">
-          <h2>How was this activity?</h2>
-          <p>How do you feel after completing it?</p>
+          <h2 id="feedback-title">How are you feeling now?</h2>
+          <p>A gentle, optional reflection before you continue.</p>
         </div>
 
         <div className="feedback-options-list">

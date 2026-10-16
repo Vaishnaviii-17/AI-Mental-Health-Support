@@ -13,6 +13,8 @@ import ActivitiesPage from "./pages/Activities";
 import BreathingBubble from "./pages/activities/BreathingBubble";
 import PopStress from "./pages/activities/PopStress";
 import MemoryMatch from "./pages/activities/MemoryMatch";
+import Meditation from "./pages/activities/Meditation";
+import CalmingMusic from "./pages/activities/CalmingMusic";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./styles/global.css";
 
@@ -102,6 +104,22 @@ function App() {
         element={
           <ProtectedRoute>
             <MemoryMatch />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/meditation"
+        element={
+          <ProtectedRoute>
+            <Meditation />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/activities/calming-music"
+        element={
+          <ProtectedRoute>
+            <CalmingMusic />
           </ProtectedRoute>
         }
       />

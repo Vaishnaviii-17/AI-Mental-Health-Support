@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <circle cx="40" cy="40" r="40" fill="#f0f4f8"/>
+  <!-- Cloud puffs -->
+  <circle cx="32" cy="44" r="12" fill="#cfd8dc"/>
+  <circle cx="44" cy="40" r="15" fill="#eceff1"/>
+  <circle cx="56" cy="44" r="11" fill="#cfd8dc"/>
+  <circle cx="40" cy="36" r="12" fill="#eceff1"/>
+  <!-- Lighten the cloud belly -->
+  <ellipse cx="44" cy="52" rx="22" ry="8" fill="#eceff1"/>
+</svg>

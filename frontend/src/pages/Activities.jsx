@@ -12,6 +12,7 @@ import {
   Leaf
 } from "lucide-react";
 import Navbar from "../components/Navbar/Navbar";
+import ZenGardenSection from "../components/activities/ZenGardenSection";
 import { getActivityHistory, getOverallStats, getActivityStats } from "../services/activityService";
 import "./Activities.css";
 
@@ -27,6 +28,8 @@ function formatActivityName(type) {
   if (type === "pop_stress") return "Pop the Stress";
   if (type === "memory_match") return "Memory Match";
   if (type === "breathing_bubble") return "Breathing Bubble";
+  if (type === "guided_meditation") return "Guided Meditation";
+  if (type === "calming_music") return "Calming Music";
   return type;
 }
 
@@ -43,113 +46,6 @@ function formatDate(dateStr) {
   }
 }
 
-function PlantVisualizer({ level }) {
-  if (level === 0) {
-    return (
-      <svg viewBox="0 0 100 100" width="130" height="130" className="garden-plant-svg">
-        {/* Pot */}
-        <path d="M 25,75 L 75,75 L 70,95 L 30,95 Z" fill="#8d6e63" />
-        <path d="M 20,75 L 80,75 L 80,70 L 20,70 Z" fill="#704f44" />
-        {/* Seed */}
-        <ellipse cx="50" cy="65" rx="6" ry="4" fill="#a1887f" />
-        <ellipse cx="50" cy="65" rx="3" ry="2" fill="#5d4037" />
-        <text x="50" y="50" textAnchor="middle" fontSize="8" fill="#8d6e63" fontWeight="bold">SEED</text>
-      </svg>
-    );
-  }
-  if (level === 1) {
-    return (
-      <svg viewBox="0 0 100 100" width="130" height="130" className="garden-plant-svg">
-        {/* Pot */}
-        <path d="M 25,75 L 75,75 L 70,95 L 30,95 Z" fill="#8d6e63" />
-        <path d="M 20,75 L 80,75 L 80,70 L 20,70 Z" fill="#704f44" />
-        {/* Sprout */}
-        <path d="M 50,70 Q 48,55 52,43" stroke="#81c784" strokeWidth="4" strokeLinecap="round" fill="none" />
-        <path d="M 52,43 Q 62,38 60,48 Q 52,48 52,43" fill="#4caf50" />
-        <path d="M 52,43 Q 42,36 40,46 Q 50,46 52,43" fill="#4caf50" />
-      </svg>
-    );
-  }
-  if (level === 2) {
-    return (
-      <svg viewBox="0 0 100 100" width="130" height="130" className="garden-plant-svg">
-        {/* Pot */}
-        <path d="M 25,75 L 75,75 L 70,95 L 30,95 Z" fill="#8d6e63" />
-        <path d="M 20,75 L 80,75 L 80,70 L 20,70 Z" fill="#704f44" />
-        {/* Stem */}
-        <path d="M 50,70 Q 46,45 50,28" stroke="#81c784" strokeWidth="5" strokeLinecap="round" fill="none" />
-        {/* Leaves */}
-        <path d="M 48,53 Q 33,48 36,58 Q 48,58 48,53" fill="#4caf50" />
-        <path d="M 50,41 Q 65,36 62,46 Q 50,46 50,41" fill="#4caf50" />
-        <path d="M 50,28 Q 62,18 59,30 Q 50,30 50,28" fill="#2e7d32" />
-        <path d="M 50,28 Q 38,16 41,28 Q 50,28 50,28" fill="#2e7d32" />
-      </svg>
-    );
-  }
-  if (level === 3) {
-    return (
-      <svg viewBox="0 0 100 100" width="130" height="130" className="garden-plant-svg">
-        {/* Pot */}
-        <path d="M 25,75 L 75,75 L 70,95 L 30,95 Z" fill="#8d6e63" />
-        <path d="M 20,75 L 80,75 L 80,70 L 20,70 Z" fill="#704f44" />
-        {/* Main Stem */}
-        <path d="M 50,70 Q 45,40 50,18" stroke="#66bb6a" strokeWidth="6" strokeLinecap="round" fill="none" />
-        {/* Branches & Leaves */}
-        <path d="M 48,55 Q 30,50 35,63 Q 47,60 48,55" fill="#2e7d32" />
-        <path d="M 51,47 Q 70,42 65,55 Q 51,53 51,47" fill="#2e7d32" />
-        <path d="M 47,35 Q 30,27 28,40 Q 45,38 47,35" fill="#4caf50" />
-        <path d="M 50,28 Q 68,20 64,33 Q 50,31 50,28" fill="#4caf50" />
-        <ellipse cx="50" cy="18" rx="4" ry="6" fill="#c8e6c9" />
-      </svg>
-    );
-  }
-  // Blooming (Level 4+)
-  return (
-    <svg viewBox="0 0 100 100" width="130" height="130" className="garden-plant-svg">
-      {/* Pot */}
-      <path d="M 25,75 L 75,75 L 70,95 L 30,95 Z" fill="#8d6e63" />
-      <path d="M 20,75 L 80,75 L 80,70 L 20,70 Z" fill="#704f44" />
-      {/* Main Stem */}
-      <path d="M 50,70 Q 46,40 50,22" stroke="#4caf50" strokeWidth="6" strokeLinecap="round" fill="none" />
-      {/* Leaves */}
-      <path d="M 48,53 Q 30,47 34,60 Q 47,58 48,53" fill="#2e7d32" />
-      <path d="M 51,43 Q 70,37 66,50 Q 51,48 51,43" fill="#2e7d32" />
-      <path d="M 48,32 Q 32,24 30,37 Q 45,35 48,32" fill="#2e7d32" />
-      {/* Flower Petals */}
-      <ellipse cx="50" cy="11" rx="5" ry="9" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" transform="rotate(0, 50, 22)" />
-      <ellipse cx="50" cy="11" rx="5" ry="9" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" transform="rotate(40, 50, 22)" />
-      <ellipse cx="50" cy="11" rx="5" ry="9" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" transform="rotate(80, 50, 22)" />
-      <ellipse cx="50" cy="11" rx="5" ry="9" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" transform="rotate(120, 50, 22)" />
-      <ellipse cx="50" cy="11" rx="5" ry="9" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" transform="rotate(160, 50, 22)" />
-      <ellipse cx="50" cy="11" rx="5" ry="9" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" transform="rotate(200, 50, 22)" />
-      <ellipse cx="50" cy="11" rx="5" ry="9" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" transform="rotate(240, 50, 22)" />
-      <ellipse cx="50" cy="11" rx="5" ry="9" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" transform="rotate(280, 50, 22)" />
-      <ellipse cx="50" cy="11" rx="5" ry="9" fill="#ffffff" stroke="#e0e0e0" strokeWidth="0.5" transform="rotate(320, 50, 22)" />
-      {/* Flower Center */}
-      <circle cx="50" cy="22" r="7" fill="#fbc02d" />
-    </svg>
-  );
-}
-
-function formatMinutes(seconds) {
-  if (!seconds || seconds <= 0) return "0 min";
-  const mins = Math.round(seconds / 60);
-  return `${mins} min`;
-}
-
-function formatHoursAndMinutes(seconds) {
-  if (!seconds || seconds <= 0) return "0 min";
-  const mins = Math.round(seconds / 60);
-  if (mins < 60) {
-    return `${mins} min`;
-  }
-  const hrs = Math.floor(mins / 60);
-  const remainingMins = mins % 60;
-  if (remainingMins === 0) {
-    return `${hrs}h`;
-  }
-  return `${hrs}h ${remainingMins}m`;
-}
 
 function ActivitiesPage() {
   const storedUser = getStoredUser();
@@ -237,6 +133,8 @@ function ActivitiesPage() {
   const getActivityIcon = (type) => {
     if (type === "pop_stress") return <Sparkles size={16} className="history-type-icon text-sparkles" />;
     if (type === "memory_match") return <Brain size={16} className="history-type-icon text-brain" />;
+    if (type === "guided_meditation") return <Compass size={16} className="history-type-icon text-meditation" />;
+    if (type === "calming_music") return <Music size={16} className="history-type-icon text-music" />;
     return <Wind size={16} className="history-type-icon text-wind" />;
   };
 
@@ -296,29 +194,29 @@ function ActivitiesPage() {
             
             <div className="activities-card-list">
               {/* MEDITATION CARD */}
-              <div className="dashboard-card activity-card card-coming-soon">
+              <div className="dashboard-card activity-card">
                 <div className="activity-card-header">
-                  <Compass size={24} className="activity-icon-lucide" />
-                  <span className="badge-coming-soon">Available soon</span>
+                  <Compass size={24} className="activity-icon-lucide text-meditation" />
+                  <span className="activity-duration">2–4 min</span>
                 </div>
                 <h3>Meditation</h3>
-                <p>Take a quiet moment and slow down.</p>
-                <button className="btn btn-ghost btn-disabled" disabled>
-                  Available soon
-                </button>
+                <p>Take a quiet moment to pause, soften tension, ground yourself, and refocus.</p>
+                <Link to="/activities/meditation" className="btn btn-primary btn-play">
+                  <Play size={14} fill="currentColor" /> Start
+                </Link>
               </div>
 
               {/* CALMING MUSIC CARD */}
-              <div className="dashboard-card activity-card card-coming-soon">
+              <div className="dashboard-card activity-card">
                 <div className="activity-card-header">
-                  <Music size={24} className="activity-icon-lucide" />
-                  <span className="badge-coming-soon">Available soon</span>
+                  <Music size={24} className="activity-icon-lucide text-music" />
+                  <span className="activity-duration">Untimed / 5–15 min</span>
                 </div>
                 <h3>Calming Music</h3>
-                <p>Take a pause with calming sounds and music.</p>
-                <button className="btn btn-ghost btn-disabled" disabled>
-                  Available soon
-                </button>
+                <p>Immerse yourself in gentle nature sounds, soft rain, ocean waves, and peaceful melodies.</p>
+                <Link to="/activities/calming-music" className="btn btn-primary btn-play">
+                  <Play size={14} fill="currentColor" /> Listen
+                </Link>
               </div>
 
               {/* BREATHING BUBBLE CARD */}
@@ -372,104 +270,14 @@ function ActivitiesPage() {
             </div>
           </section>
 
-          {/* E. YOUR PROGRESS / GARDEN */}
-          <section className="activities-section">
-            <div className="section-block-title-row">
-              <span className="eyebrow">Progress</span>
-              <h2>Your Garden</h2>
-            </div>
+          {/* E. POLISHED ZEN GARDEN & SAND RAKE (v2) */}
+          <ZenGardenSection
+            overall={overall}
+            loading={loadingOverall}
+            error={errorOverall}
+            onRetry={fetchOverall}
+          />
 
-            {loadingOverall ? (
-              <div className="dashboard-card garden-hero-card card-loading-center">
-                <p className="no-stats-msg">Growing your garden...</p>
-              </div>
-            ) : errorOverall ? (
-              <div className="dashboard-card garden-hero-card card-loading-center">
-                <p className="no-stats-msg text-error-msg">Unable to load garden progress.</p>
-                <button onClick={fetchOverall} className="btn btn-ghost btn-retry">Retry</button>
-              </div>
-            ) : overall ? (
-              <div className="dashboard-card garden-hero-card">
-                
-                {/* Centered Plant SVG Column */}
-                <div className="garden-hero-plant-col">
-                  <PlantVisualizer level={overall.garden.gardenLevel} />
-                </div>
-
-                {/* Progress Details Column */}
-                <div className="garden-hero-details-col">
-                  <div className="garden-badge-wrap">
-                    <div className="garden-badge">
-                      <Leaf size={12} className="garden-badge-icon" /> {overall.garden.gardenStage}
-                    </div>
-                  </div>
-                  
-                  <h3 className="garden-hero-title">{overall.garden.gardenStage}</h3>
-                  
-                  <p className="garden-hero-ratio-text">
-                    {overall.garden.completedActivities === 1 
-                      ? "1 activity completed"
-                      : `${overall.garden.completedActivities} activities completed`}
-                  </p>
-
-                  <div className="garden-hero-progress-row">
-                    <div className="garden-progress-bar-wrapper">
-                      <div 
-                        className={`garden-progress-bar-fill level-${overall.garden.gardenLevel}`}
-                        style={{ width: `${overall.garden.progressToNextLevel}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  {overall.garden.completedActivities === 0 ? (
-                    <p className="garden-hero-tip-text">
-                      You haven't completed an activity yet. Start your first activity to grow your garden.
-                    </p>
-                  ) : (
-                    <p className="garden-hero-tip-text">
-                      {overall.garden.nextLevelAt 
-                        ? `${overall.garden.nextLevelAt - overall.garden.completedActivities} more activities to reach ${
-                            overall.garden.gardenLevel === 0 ? "Sprout"
-                            : overall.garden.gardenLevel === 1 ? "Growing"
-                            : overall.garden.gardenLevel === 2 ? "Young Plant"
-                            : "Blooming"
-                          }`
-                        : "Your garden has reached full bloom! Beautiful job."}
-                    </p>
-                  )}
-
-                  {/* Mindful Time Breakdown Side-by-Side */}
-                  <div className="garden-hero-mindful-grid">
-                    <div className="garden-hero-mindful-item">
-                      <span>Today's mindful time</span>
-                      <strong>{formatMinutes(overall.todayMindfulSeconds)}</strong>
-                    </div>
-                    <div className="garden-hero-mindful-item">
-                      <span>This week</span>
-                      <strong>{formatHoursAndMinutes(overall.weekMindfulSeconds)}</strong>
-                    </div>
-                  </div>
-
-                  {/* Feedback summary rating */}
-                  {overall.feedback.ratingCount > 0 ? (
-                    <div className="garden-hero-feedback-summary">
-                      <span className="feedback-summary-lbl">Activity Experience: </span>
-                      <strong className="feedback-summary-val">{overall.feedback.averageRating} / 5</strong>
-                      <span className="feedback-summary-count"> (Based on {overall.feedback.ratingCount} ratings)</span>
-                    </div>
-                  ) : (
-                    <div className="garden-hero-feedback-summary">
-                      <span className="feedback-summary-lbl">Activity Experience: </span>
-                      <span className="feedback-summary-val" style={{ color: "var(--text-muted)", fontSize: "var(--fs-2xs)" }}>
-                        No feedback yet
-                      </span>
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            ) : null}
-          </section>
 
           {/* F. ACTIVITY INSIGHTS (STATS) */}
           <section className="activities-section">

@@ -16,6 +16,11 @@ export const updateProfile = async (profileData) => {
   return response.data?.data ?? response.data;
 };
 
+export const updatePersonalization = async (data) => {
+  const response = await api.put("/user/personalization", data, authConfig());
+  return response.data?.data ?? response.data;
+};
+
 export const changePassword = async (passwordData) => {
   const response = await api.put("/user/password", passwordData, authConfig());
   return response.data?.data ?? response.data;
